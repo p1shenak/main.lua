@@ -1,31 +1,20 @@
 --[[
-    FONDI MM2 V4.1 // ROUND-SAFE EDITION
+    FONDI MM2 V4.1 // ROUND SAFE EDITION
 
-    FEATURES:
-    - ESP
-    - Highlight Outline
-    - Role Detection
+    FIX:
+    - ESP восстанавливается после смерти
+    - ESP восстанавливается после нового раунда
+    - ESP восстанавливается после респавна
+    - Роль обновляется автоматически
     - Murderer = RED
     - Sheriff = BLUE
     - Innocent = GREEN
-    - Player List
-    - Spectator
+    - Box ESP
+    - Tracers
     - Fly
     - Noclip
-    - Settings
-    - Hotkeys
-
-    HOTKEYS:
-    L = Menu
-    V = Fly
-    B = Noclip
-    P = Player List
-    O = Spectator
+    - GUI
 ]]
-
---------------------------------------------------
--- SERVICES
---------------------------------------------------
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -53,33 +42,12 @@ local Settings = {
     FlySpeed = 50,
 
     Spectating = false,
-    SpectatedPlayer = nil,
-
-    MenuKey = Enum.KeyCode.L,
-    FlyKey = Enum.KeyCode.V,
-    NoclipKey = Enum.KeyCode.B,
-    PlayerListKey = Enum.KeyCode.P,
-    SpectatorKey = Enum.KeyCode.O
+    SpectatedPlayer = nil
 }
 
 local KEY = "FONDI-MM2-FOREVER"
 
 local IsAuthenticated = false
-
---------------------------------------------------
--- STORAGE
---------------------------------------------------
-
-local ESPObjects = {}
-
-local MainGUI = nil
-local MainFrame = nil
-
-local PlayerListGUI = nil
-local PlayerListFrame = nil
-
-local flyBV = nil
-local flyBG = nil
 
 --------------------------------------------------
 -- NOTIFICATION
@@ -92,83 +60,59 @@ local function Notify(text, color)
     local sg = pg:FindFirstChild("Fondi_Notify")
 
     if not sg then
-
         sg = Instance.new("ScreenGui")
         sg.Name = "Fondi_Notify"
         sg.ResetOnSpawn = false
         sg.Parent = pg
-
     end
 
     local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 230, 0, 45)
+    frame.Position = UDim2.new(1, 10, 0.8, 0)
 
-    frame.Size = UDim2.new(0, 250, 0, 45)
-    frame.Position = UDim2.new(1, 20, 0.8, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
 
-    frame.BackgroundColor3 =
-        Color3.fromRGB(12, 12, 18)
+    Instance.new("UICorner", frame)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color or Color3.fromRGB(120, 50, 255)
+    stroke.Parent = frame
 
     frame.Parent = sg
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = frame
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.fromScale(1, 1)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = tostring(text)
+    lbl.TextColor3 = Color3.new(1, 1, 1)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 13
+    lbl.Parent = frame
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color =
-        color or Color3.fromRGB(120, 50, 255)
-    stroke.Thickness = 1.5
-    stroke.Parent = frame
+    frame:TweenPosition(
+        UDim2.new(1, -240, 0.8, 0),
+        Enum.EasingDirection.Out,
+        Enum.EasingStyle.Back,
+        0.5
+    )
 
-    local label = Instance.new("TextLabel")
+    task.delay(2.5, function()
 
-    label.Size = UDim2.new(1, -10, 1, 0)
-    label.Position = UDim2.new(0, 5, 0, 0)
+        if frame and frame.Parent then
 
-    label.BackgroundTransparency = 1
-    label.Text = tostring(text)
+            frame:TweenPosition(
+                UDim2.new(1, 10, 0.8, 0),
+                Enum.EasingDirection.In,
+                Enum.EasingStyle.Quad,
+                0.5
+            )
 
-    label.TextColor3 =
-        Color3.new(1, 1, 1)
+            task.wait(0.5)
 
-    label.Font =
-        Enum.Font.GothamBold
+            if frame then
+                frame:Destroy()
+            end
 
-    label.TextSize = 13
-    label.Parent = frame
-
-    TweenService:Create(
-        frame,
-        TweenInfo.new(
-            0.35,
-            Enum.EasingStyle.Back,
-            Enum.EasingDirection.Out
-        ),
-        {
-            Position =
-                UDim2.new(1, -270, 0.8, 0)
-        }
-    ):Play()
-
-    task.delay(2.3, function()
-
-        if not frame then
-            return
-        end
-
-        TweenService:Create(
-            frame,
-            TweenInfo.new(0.3),
-            {
-                Position =
-                    UDim2.new(1, 20, 0.8, 0)
-            }
-        ):Play()
-
-        task.wait(0.35)
-
-        if frame then
-            frame:Destroy()
         end
 
     end)
@@ -179,122 +123,71 @@ end
 -- ROLE DETECTION
 --------------------------------------------------
 
-local function HasTool(player, names)
-
-    if not player then
-        return false
-    end
-
-    local backpack =
-        player:FindFirstChild("Backpack")
-
-    local character =
-        player.Character
-
-    for _, name in ipairs(names) do
-
-        if backpack
-            and backpack:FindFirstChild(name) then
-
-            return true
-
-        end
-
-        if character
-            and character:FindFirstChild(name) then
-
-            return true
-
-        end
-
-    end
-
-    return false
-end
-
---------------------------------------------------
-
 local function GetRole(player)
 
     if not player then
         return "Innocent"
     end
 
-    --------------------------------------------------
-    -- MURDERER
-    --------------------------------------------------
+    local backpack = player:FindFirstChild("Backpack")
+    local character = player.Character
 
-    if HasTool(player, {
-        "Knife",
-        "DefaultKnife",
-        "KnifeServer"
-    }) then
-
+    if
+        (backpack and backpack:FindFirstChild("Knife"))
+        or
+        (character and character:FindFirstChild("Knife"))
+    then
         return "Murderer"
-
     end
 
-    --------------------------------------------------
-    -- SHERIFF
-    --------------------------------------------------
-
-    if HasTool(player, {
-        "Gun",
-        "Revolver",
-        "DefaultGun",
-        "SheriffGun"
-    }) then
-
+    if
+        (backpack and backpack:FindFirstChild("Gun"))
+        or
+        (character and character:FindFirstChild("Gun"))
+        or
+        (backpack and backpack:FindFirstChild("Revolver"))
+        or
+        (character and character:FindFirstChild("Revolver"))
+    then
         return "Sheriff"
-
     end
 
     return "Innocent"
 end
 
 --------------------------------------------------
+-- ROLE COLOR
+--------------------------------------------------
 
 local function GetRoleColor(role)
 
     if role == "Murderer" then
-
-        return Color3.fromRGB(
-            255,
-            30,
-            30
-        )
+        return Color3.fromRGB(255, 40, 40)
 
     elseif role == "Sheriff" then
-
-        return Color3.fromRGB(
-            40,
-            120,
-            255
-        )
+        return Color3.fromRGB(50, 120, 255)
 
     else
-
-        return Color3.fromRGB(
-            50,
-            255,
-            100
-        )
-
+        return Color3.fromRGB(70, 255, 100)
     end
+
 end
 
 --------------------------------------------------
--- ESP
+-- ESP SYSTEM
 --------------------------------------------------
+
+local ESPObjects = {}
 
 local UpdateESP
 
 --------------------------------------------------
+-- REMOVE ESP
+--------------------------------------------------
 
 local function RemoveESP(player)
 
-    local data =
-        ESPObjects[player]
+    local data = ESPObjects[player]
 
     if not data then
         return
@@ -304,13 +197,20 @@ local function RemoveESP(player)
         data.Highlight:Destroy()
     end
 
-    if data.Billboard then
-        data.Billboard:Destroy()
+    if data.NameGui then
+        data.NameGui:Destroy()
+    end
+
+    if data.Tracer then
+        data.Tracer:Destroy()
     end
 
     ESPObjects[player] = nil
+
 end
 
+--------------------------------------------------
+-- CREATE ESP
 --------------------------------------------------
 
 local function CreateESP(player)
@@ -321,161 +221,179 @@ local function CreateESP(player)
 
     RemoveESP(player)
 
-    local data = {}
+    local character = player.Character
+
+    if not character then
+        return
+    end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+
+    if not humanoid or not root then
+        return
+    end
 
     --------------------------------------------------
     -- HIGHLIGHT
     --------------------------------------------------
 
-    local highlight =
-        Instance.new("Highlight")
+    local highlight = Instance.new("Highlight")
 
-    highlight.Name =
-        "Fondi_Outline"
+    highlight.Name = "Fondi_ESP"
 
-    highlight.DepthMode =
-        Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Adornee = character
 
-    highlight.FillTransparency =
-        0.88
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+    highlight.FillTransparency = 0.75
 
     highlight.OutlineTransparency =
-        0
+        Settings.Outline and 0 or 1
 
-    highlight.Enabled = false
+    local role = GetRole(player)
 
-    highlight.Parent = pg
+    highlight.FillColor = GetRoleColor(role)
+    highlight.OutlineColor = GetRoleColor(role)
 
-    --------------------------------------------------
-    -- NAME
-    --------------------------------------------------
+    highlight.Enabled = Settings.ESP
 
-    local billboard =
-        Instance.new("BillboardGui")
-
-    billboard.Name =
-        "Fondi_Name"
-
-    billboard.Size =
-        UDim2.new(0, 200, 0, 45)
-
-    billboard.StudsOffset =
-        Vector3.new(0, 3.5, 0)
-
-    billboard.AlwaysOnTop = true
-    billboard.Enabled = false
-    billboard.Parent = pg
-
-    local label =
-        Instance.new("TextLabel")
-
-    label.Size =
-        UDim2.new(1, 0, 1, 0)
-
-    label.BackgroundTransparency = 1
-
-    label.TextColor3 =
-        Color3.new(1, 1, 1)
-
-    label.TextStrokeTransparency =
-        0.15
-
-    label.Font =
-        Enum.Font.GothamBold
-
-    label.TextSize = 13
-
-    label.Parent = billboard
-
-    data.Highlight = highlight
-    data.Billboard = billboard
-    data.Label = label
-
-    ESPObjects[player] = data
+    highlight.Parent = character
 
     --------------------------------------------------
-    -- CHARACTER ADDED
-    -- Срабатывает после каждой смерти
-    -- и каждого нового раунда
+    -- NAME GUI
     --------------------------------------------------
 
-    player.CharacterAdded:Connect(function(character)
+    local nameGui = nil
 
-        data.Character = character
+    if Settings.ShowNames or Settings.ShowRoles then
 
-        highlight.Adornee = nil
-        highlight.Enabled = false
+        nameGui = Instance.new("BillboardGui")
 
-        billboard.Adornee = nil
-        billboard.Enabled = false
+        nameGui.Name = "Fondi_NameESP"
 
-        local root =
-            character:WaitForChild(
-                "HumanoidRootPart",
-                10
-            )
+        nameGui.Adornee = root
 
-        if not root then
-            return
+        nameGui.Size = UDim2.new(0, 220, 0, 50)
+
+        nameGui.StudsOffset = Vector3.new(0, 3.2, 0)
+
+        nameGui.AlwaysOnTop = true
+
+        nameGui.Parent = character
+
+        local label = Instance.new("TextLabel")
+
+        label.Name = "Text"
+
+        label.Size = UDim2.fromScale(1, 1)
+
+        label.BackgroundTransparency = 1
+
+        label.Font = Enum.Font.GothamBold
+
+        label.TextScaled = true
+
+        label.TextStrokeTransparency = 0
+
+        label.TextColor3 = GetRoleColor(role)
+
+        label.Parent = nameGui
+
+        local text = ""
+
+        if Settings.ShowNames then
+            text = player.DisplayName
         end
 
-        task.wait(0.2)
+        if Settings.ShowRoles then
 
-        if player.Parent == Players then
-            UpdateESP(player)
+            if text ~= "" then
+                text = text .. " | "
+            end
+
+            text = text .. role
+
         end
 
-    end)
-
-    --------------------------------------------------
-    -- CHARACTER REMOVING
-    --------------------------------------------------
-
-    player.CharacterRemoving:Connect(function()
-
-        data.Character = nil
-
-        highlight.Adornee = nil
-        highlight.Enabled = false
-
-        billboard.Adornee = nil
-        billboard.Enabled = false
-
-    end)
-
-    --------------------------------------------------
-    -- EXISTING CHARACTER
-    --------------------------------------------------
-
-    if player.Character then
-
-        data.Character =
-            player.Character
-
-        task.spawn(function()
-
-            local root =
-                player.Character:FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            if not root then
-
-                root =
-                    player.Character:WaitForChild(
-                        "HumanoidRootPart",
-                        10
-                    )
-
-            end
-
-            if root then
-                UpdateESP(player)
-            end
-
-        end)
+        label.Text = text
 
     end
+
+    --------------------------------------------------
+    -- TRACER
+    --------------------------------------------------
+
+    local tracer = nil
+
+    if Settings.Tracers then
+
+        tracer = Instance.new("Beam")
+
+        tracer.Name = "Fondi_Tracer"
+
+        tracer.FaceCamera = true
+
+        tracer.Width0 = 0.08
+        tracer.Width1 = 0.08
+
+        tracer.Color = ColorSequence.new(
+            GetRoleColor(role)
+        )
+
+        tracer.Transparency =
+            NumberSequence.new(0.15)
+
+        local attachment0 = Instance.new("Attachment")
+
+        attachment0.Name = "Fondi_TracerStart"
+
+        attachment0.Parent = root
+
+        local myCharacter = LP.Character
+
+        local myRoot =
+            myCharacter
+            and myCharacter:FindFirstChild("HumanoidRootPart")
+
+        if myRoot then
+
+            local attachment1 = Instance.new("Attachment")
+
+            attachment1.Name = "Fondi_TracerEnd"
+
+            attachment1.Parent = myRoot
+
+            tracer.Attachment0 = attachment1
+            tracer.Attachment1 = attachment0
+
+            tracer.Parent = character
+
+        else
+
+            tracer:Destroy()
+            tracer = nil
+
+        end
+
+    end
+
+    --------------------------------------------------
+    -- SAVE
+    --------------------------------------------------
+
+    ESPObjects[player] = {
+
+        Highlight = highlight,
+
+        NameGui = nameGui,
+
+        Tracer = tracer,
+
+        Character = character
+
+    }
+
 end
 
 --------------------------------------------------
@@ -488,259 +406,281 @@ UpdateESP = function(player)
         return
     end
 
-    local data =
-        ESPObjects[player]
+    if not Settings.ESP then
 
-    if not data then
+        RemoveESP(player)
+
         return
+
     end
 
-    local character =
-        player.Character
-
-    --------------------------------------------------
-    -- NO CHARACTER
-    --------------------------------------------------
+    local character = player.Character
 
     if not character then
 
-        data.Highlight.Adornee = nil
-        data.Highlight.Enabled = false
-
-        data.Billboard.Adornee = nil
-        data.Billboard.Enabled = false
+        RemoveESP(player)
 
         return
-    end
 
-    --------------------------------------------------
-    -- HUMANOID
-    --------------------------------------------------
+    end
 
     local humanoid =
-        character:FindFirstChildOfClass(
-            "Humanoid"
-        )
+        character:FindFirstChildOfClass("Humanoid")
 
     local root =
-        character:FindFirstChild(
-            "HumanoidRootPart"
-        )
+        character:FindFirstChild("HumanoidRootPart")
 
-    --------------------------------------------------
-    -- DEAD
-    --------------------------------------------------
+    if not humanoid or not root then
 
-    if not humanoid
-        or not root
-        or humanoid.Health <= 0 then
-
-        data.Highlight.Adornee = nil
-        data.Highlight.Enabled = false
-
-        data.Billboard.Adornee = nil
-        data.Billboard.Enabled = false
+        RemoveESP(player)
 
         return
+
     end
 
-    --------------------------------------------------
-    -- ESP OFF
-    --------------------------------------------------
+    if humanoid.Health <= 0 then
 
-    if not Settings.ESP
-        or not IsAuthenticated then
-
-        data.Highlight.Enabled = false
-        data.Billboard.Enabled = false
+        RemoveESP(player)
 
         return
-    end
-
-    --------------------------------------------------
-    -- ROLE
-    --------------------------------------------------
-
-    local role =
-        GetRole(player)
-
-    local color =
-        GetRoleColor(role)
-
-    --------------------------------------------------
-    -- HIGHLIGHT
-    --------------------------------------------------
-
-    data.Highlight.Adornee =
-        character
-
-    data.Highlight.Enabled =
-        Settings.Outline
-
-    data.Highlight.FillColor =
-        color
-
-    data.Highlight.OutlineColor =
-        color
-
-    --------------------------------------------------
-    -- NAME
-    --------------------------------------------------
-
-    data.Billboard.Adornee =
-        root
-
-    data.Billboard.Enabled =
-        Settings.ShowNames
-
-    if Settings.ShowRoles then
-
-        data.Label.Text =
-            player.DisplayName ..
-            "\n[" ..
-            role ..
-            "]"
-
-    else
-
-        data.Label.Text =
-            player.DisplayName
 
     end
 
-    data.Label.TextColor3 =
-        color
+    --------------------------------------------------
+    -- CHARACTER CHANGED
+    --------------------------------------------------
+
+    local data = ESPObjects[player]
+
+    if not data or data.Character ~= character then
+
+        CreateESP(player)
+
+        return
+
+    end
+
+    --------------------------------------------------
+    -- ROLE UPDATE
+    --------------------------------------------------
+
+    local role = GetRole(player)
+
+    local roleColor = GetRoleColor(role)
+
+    --------------------------------------------------
+    -- HIGHLIGHT UPDATE
+    --------------------------------------------------
+
+    if data.Highlight then
+
+        data.Highlight.Adornee = character
+
+        data.Highlight.Enabled = Settings.ESP
+
+        data.Highlight.FillColor = roleColor
+
+        data.Highlight.OutlineColor = roleColor
+
+        data.Highlight.OutlineTransparency =
+            Settings.Outline and 0 or 1
+
+    end
+
+    --------------------------------------------------
+    -- NAME UPDATE
+    --------------------------------------------------
+
+    if data.NameGui then
+
+        data.NameGui.Adornee = root
+
+        local label =
+            data.NameGui:FindFirstChild("Text")
+
+        if label then
+
+            local text = ""
+
+            if Settings.ShowNames then
+                text = player.DisplayName
+            end
+
+            if Settings.ShowRoles then
+
+                if text ~= "" then
+                    text = text .. " | "
+                end
+
+                text = text .. role
+
+            end
+
+            label.Text = text
+
+            label.TextColor3 = roleColor
+
+        end
+
+    end
+
+    --------------------------------------------------
+    -- TRACER UPDATE
+    --------------------------------------------------
+
+    if Settings.Tracers then
+
+        if not data.Tracer then
+
+            CreateESP(player)
+
+            return
+
+        end
+
+        data.Tracer.Color =
+            ColorSequence.new(roleColor)
+
+    elseif data.Tracer then
+
+        data.Tracer:Destroy()
+
+        data.Tracer = nil
+
+    end
 
 end
 
 --------------------------------------------------
--- SETUP PLAYER
+-- PLAYER ESP SETUP
 --------------------------------------------------
 
-local function SetupPlayer(player)
+local function SetupPlayerESP(player)
 
     if player == LP then
         return
     end
 
-    CreateESP(player)
+    --------------------------------------------------
+    -- NEW CHARACTER
+    --------------------------------------------------
+
+    player.CharacterAdded:Connect(function(character)
+
+        task.spawn(function()
+
+            local humanoid =
+                character:WaitForChild(
+                    "Humanoid",
+                    8
+                )
+
+            local root =
+                character:WaitForChild(
+                    "HumanoidRootPart",
+                    8
+                )
+
+            if humanoid and root then
+
+                task.wait(0.25)
+
+                if IsAuthenticated
+                    and Settings.ESP
+                    and player.Parent
+                then
+
+                    CreateESP(player)
+
+                end
+
+            end
+
+        end)
+
+    end)
+
+    --------------------------------------------------
+    -- CHARACTER REMOVING
+    --------------------------------------------------
+
+    player.CharacterRemoving:Connect(function()
+
+        RemoveESP(player)
+
+    end)
+
+    --------------------------------------------------
+    -- EXISTING CHARACTER
+    --------------------------------------------------
+
+    if player.Character then
+
+        task.defer(function()
+
+            if IsAuthenticated
+                and Settings.ESP
+            then
+
+                CreateESP(player)
+
+            end
+
+        end)
+
+    end
 
 end
 
 --------------------------------------------------
--- PLAYER ADDED
+-- SETUP CURRENT PLAYERS
+--------------------------------------------------
+
+for _, player in ipairs(Players:GetPlayers()) do
+
+    if player ~= LP then
+        SetupPlayerESP(player)
+    end
+
+end
+
+--------------------------------------------------
+-- NEW PLAYER
 --------------------------------------------------
 
 Players.PlayerAdded:Connect(function(player)
 
-    SetupPlayer(player)
+    SetupPlayerESP(player)
 
 end)
 
 --------------------------------------------------
--- PLAYER REMOVING
+-- PLAYER LEFT
 --------------------------------------------------
 
 Players.PlayerRemoving:Connect(function(player)
 
     RemoveESP(player)
 
-    if Settings.SpectatedPlayer == player then
-
-        Settings.SpectatedPlayer = nil
-        Settings.Spectating = false
-
-        local character =
-            LP.Character
-
-        local humanoid =
-            character
-            and character:FindFirstChildOfClass(
-                "Humanoid"
-            )
-
-        if humanoid then
-
-            workspace.CurrentCamera.CameraSubject =
-                humanoid
-
-        end
-
-    end
-
 end)
 
 --------------------------------------------------
--- EXISTING PLAYERS
---------------------------------------------------
-
-for _, player in ipairs(
-    Players:GetPlayers()
-) do
-
-    if player ~= LP then
-        SetupPlayer(player)
-    end
-
-end
-
---------------------------------------------------
--- ESP UPDATE LOOP
+-- ESP REFRESH LOOP
 --------------------------------------------------
 
 task.spawn(function()
 
-    while task.wait(0.15) do
+    while true do
 
-        if not IsAuthenticated then
-            continue
-        end
+        task.wait(0.4)
 
-        for _, player in ipairs(
-            Players:GetPlayers()
-        ) do
+        if IsAuthenticated then
 
-            if player ~= LP then
+            for _, player in ipairs(Players:GetPlayers()) do
 
-                if not ESPObjects[player] then
-                    SetupPlayer(player)
+                if player ~= LP then
+                    UpdateESP(player)
                 end
-
-                UpdateESP(player)
-
-            end
-
-        end
-
-    end
-
-end)
-
---------------------------------------------------
--- EXTRA ROLE CHECK
--- Нужен для момента, когда Knife/Gun
--- появляется немного позже Character
---------------------------------------------------
-
-task.spawn(function()
-
-    while task.wait(0.5) do
-
-        if not IsAuthenticated then
-            continue
-        end
-
-        for player, data in pairs(
-            ESPObjects
-        ) do
-
-            if player.Parent ~= Players then
-
-                RemoveESP(player)
-
-            else
-
-                UpdateESP(player)
 
             end
 
@@ -754,82 +694,22 @@ end)
 -- FLY
 --------------------------------------------------
 
+local flyBV = nil
+local flyBG = nil
+
 local function StopFly()
 
     if flyBV then
-
         flyBV:Destroy()
         flyBV = nil
-
     end
 
     if flyBG then
-
         flyBG:Destroy()
         flyBG = nil
-
     end
 
 end
-
---------------------------------------------------
-
-local function StartFly()
-
-    local character =
-        LP.Character
-
-    if not character then
-        return
-    end
-
-    local root =
-        character:FindFirstChild(
-            "HumanoidRootPart"
-        )
-
-    if not root then
-        return
-    end
-
-    if flyBV then
-        return
-    end
-
-    flyBV =
-        Instance.new("BodyVelocity")
-
-    flyBV.MaxForce =
-        Vector3.new(
-            1e7,
-            1e7,
-            1e7
-        )
-
-    flyBV.Velocity =
-        Vector3.zero
-
-    flyBV.Parent =
-        root
-
-    flyBG =
-        Instance.new("BodyGyro")
-
-    flyBG.MaxTorque =
-        Vector3.new(
-            1e7,
-            1e7,
-            1e7
-        )
-
-    flyBG.D = 100
-
-    flyBG.Parent =
-        root
-
-end
-
---------------------------------------------------
 
 RunService.RenderStepped:Connect(function()
 
@@ -837,115 +717,116 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
-    if not Settings.Fly then
+    local character = LP.Character
 
+    if not character then
         StopFly()
         return
-
     end
-
-    local character =
-        LP.Character
 
     local root =
-        character
-        and character:FindFirstChild(
-            "HumanoidRootPart"
-        )
+        character:FindFirstChild("HumanoidRootPart")
 
     if not root then
-
         StopFly()
         return
-
     end
 
-    if not flyBV then
-        StartFly()
-    end
+    if Settings.Fly then
 
-    if not flyBV or not flyBG then
-        return
-    end
+        if not flyBV then
 
-    local camera =
-        workspace.CurrentCamera
+            flyBV = Instance.new("BodyVelocity")
 
-    local direction =
-        Vector3.zero
+            flyBV.Name = "Fondi_FlyVelocity"
 
-    if UIS:IsKeyDown(
-        Enum.KeyCode.W
-    ) then
+            flyBV.MaxForce =
+                Vector3.new(
+                    10000000,
+                    10000000,
+                    10000000
+                )
 
-        direction +=
-            camera.CFrame.LookVector
+            flyBV.Parent = root
 
-    end
+        end
 
-    if UIS:IsKeyDown(
-        Enum.KeyCode.S
-    ) then
+        if not flyBG then
 
-        direction -=
-            camera.CFrame.LookVector
+            flyBG = Instance.new("BodyGyro")
 
-    end
+            flyBG.Name = "Fondi_FlyGyro"
 
-    if UIS:IsKeyDown(
-        Enum.KeyCode.A
-    ) then
+            flyBG.MaxTorque =
+                Vector3.new(
+                    10000000,
+                    10000000,
+                    10000000
+                )
 
-        direction -=
-            camera.CFrame.RightVector
+            flyBG.D = 100
 
-    end
+            flyBG.Parent = root
 
-    if UIS:IsKeyDown(
-        Enum.KeyCode.D
-    ) then
+        end
 
-        direction +=
-            camera.CFrame.RightVector
+        local camera =
+            workspace.CurrentCamera
 
-    end
+        local direction =
+            Vector3.new(0, 0, 0)
 
-    if UIS:IsKeyDown(
-        Enum.KeyCode.Space
-    ) then
+        if UIS:IsKeyDown(Enum.KeyCode.W) then
+            direction =
+                direction + camera.CFrame.LookVector
+        end
 
-        direction +=
-            Vector3.new(0, 1, 0)
+        if UIS:IsKeyDown(Enum.KeyCode.S) then
+            direction =
+                direction - camera.CFrame.LookVector
+        end
 
-    end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then
+            direction =
+                direction - camera.CFrame.RightVector
+        end
 
-    if UIS:IsKeyDown(
-        Enum.KeyCode.LeftShift
-    ) then
+        if UIS:IsKeyDown(Enum.KeyCode.D) then
+            direction =
+                direction + camera.CFrame.RightVector
+        end
 
-        direction -=
-            Vector3.new(0, 1, 0)
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then
+            direction =
+                direction + Vector3.new(0, 1, 0)
+        end
 
-    end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftShift) then
+            direction =
+                direction - Vector3.new(0, 1, 0)
+        end
 
-    if direction.Magnitude > 0 then
+        if direction.Magnitude > 0 then
 
-        direction =
-            direction.Unit
+            flyBV.Velocity =
+                direction.Unit *
+                Settings.FlySpeed
 
-        flyBV.Velocity =
-            direction *
-            Settings.FlySpeed
+        else
+
+            flyBV.Velocity =
+                Vector3.new(0, 0, 0)
+
+        end
+
+        flyBG.CFrame =
+            camera.CFrame
 
     else
 
-        flyBV.Velocity =
-            Vector3.zero
+        StopFly()
 
     end
-
-    flyBG.CFrame =
-        camera.CFrame
 
 end)
 
@@ -963,8 +844,7 @@ RunService.Stepped:Connect(function()
         return
     end
 
-    local character =
-        LP.Character
+    local character = LP.Character
 
     if not character then
         return
@@ -975,9 +855,7 @@ RunService.Stepped:Connect(function()
     ) do
 
         if object:IsA("BasePart") then
-
             object.CanCollide = false
-
         end
 
     end
@@ -985,310 +863,63 @@ RunService.Stepped:Connect(function()
 end)
 
 --------------------------------------------------
--- SPECTATOR
---------------------------------------------------
-
-local function StopSpectating()
-
-    Settings.Spectating = false
-    Settings.SpectatedPlayer = nil
-
-    local character =
-        LP.Character
-
-    local humanoid =
-        character
-        and character:FindFirstChildOfClass(
-            "Humanoid"
-        )
-
-    if humanoid then
-
-        workspace.CurrentCamera.CameraSubject =
-            humanoid
-
-    end
-
-    Notify(
-        "SPECTATOR: ВЫКЛ",
-        Color3.fromRGB(
-            255,
-            80,
-            80
-        )
-    )
-
-end
-
---------------------------------------------------
-
-local function SpectatePlayer(player)
-
-    if not player
-        or player == LP then
-
-        return
-    end
-
-    local character =
-        player.Character
-
-    local humanoid =
-        character
-        and character:FindFirstChildOfClass(
-            "Humanoid"
-        )
-
-    if not humanoid then
-
-        Notify(
-            "Игрок ещё не загрузился",
-            Color3.fromRGB(
-                255,
-                180,
-                60
-            )
-        )
-
-        return
-    end
-
-    Settings.Spectating = true
-    Settings.SpectatedPlayer = player
-
-    workspace.CurrentCamera.CameraSubject =
-        humanoid
-
-    Notify(
-        "SPECTATE: " ..
-        player.DisplayName,
-        Color3.fromRGB(
-            120,
-            50,
-            255
-        )
-    )
-
-end
-
---------------------------------------------------
 -- PLAYER LIST
 --------------------------------------------------
 
-local function CreatePlayerList()
+local function CreatePlayerList(parent)
 
-    if PlayerListGUI then
+    local listFrame = Instance.new("Frame")
 
-        PlayerListGUI.Enabled = true
-        return
+    listFrame.Name = "PlayerList"
 
-    end
+    listFrame.Size =
+        UDim2.new(1, -20, 0, 120)
 
-    PlayerListGUI =
-        Instance.new("ScreenGui")
+    listFrame.BackgroundTransparency = 1
 
-    PlayerListGUI.Name =
-        "Fondi_PlayerList"
+    listFrame.Parent = parent
 
-    PlayerListGUI.ResetOnSpawn = false
-    PlayerListGUI.Parent = pg
-
-    --------------------------------------------------
-
-    PlayerListFrame =
-        Instance.new("Frame")
-
-    PlayerListFrame.Size =
-        UDim2.new(
-            0,
-            300,
-            0,
-            360
-        )
-
-    PlayerListFrame.Position =
-        UDim2.new(
-            1,
-            -320,
-            0.5,
-            -180
-        )
-
-    PlayerListFrame.BackgroundColor3 =
-        Color3.fromRGB(
-            14,
-            14,
-            20
-        )
-
-    PlayerListFrame.Active = true
-    PlayerListFrame.Draggable = true
-
-    PlayerListFrame.Parent =
-        PlayerListGUI
-
-    local corner =
-        Instance.new("UICorner")
-
-    corner.CornerRadius =
-        UDim.new(0, 10)
-
-    corner.Parent =
-        PlayerListFrame
-
-    local stroke =
-        Instance.new("UIStroke")
-
-    stroke.Color =
-        Color3.fromRGB(
-            120,
-            50,
-            255
-        )
-
-    stroke.Thickness = 2
-    stroke.Parent =
-        PlayerListFrame
-
-    --------------------------------------------------
-    -- TITLE
-    --------------------------------------------------
-
-    local title =
-        Instance.new("TextLabel")
+    local title = Instance.new("TextLabel")
 
     title.Size =
-        UDim2.new(
-            1,
-            -50,
-            0,
-            45
-        )
-
-    title.Position =
-        UDim2.new(
-            0,
-            10,
-            0,
-            0
-        )
+        UDim2.new(1, 0, 0, 25)
 
     title.BackgroundTransparency = 1
 
-    title.Text =
-        "FONDI // PLAYER LIST"
+    title.Text = "PLAYER LIST"
 
     title.TextColor3 =
-        Color3.new(1, 1, 1)
+        Color3.fromRGB(180, 180, 180)
 
-    title.Font =
-        Enum.Font.GothamBold
+    title.Font = Enum.Font.GothamBold
 
-    title.TextSize = 15
+    title.TextSize = 12
 
-    title.Parent =
-        PlayerListFrame
+    title.Parent = listFrame
 
-    --------------------------------------------------
-    -- CLOSE
-    --------------------------------------------------
-
-    local close =
-        Instance.new("TextButton")
-
-    close.Size =
-        UDim2.new(
-            0,
-            35,
-            0,
-            35
-        )
-
-    close.Position =
-        UDim2.new(
-            1,
-            -40,
-            0,
-            5
-        )
-
-    close.Text = "X"
-
-    close.TextColor3 =
-        Color3.new(1, 1, 1)
-
-    close.BackgroundColor3 =
-        Color3.fromRGB(
-            35,
-            35,
-            45
-        )
-
-    close.Font =
-        Enum.Font.GothamBold
-
-    close.Parent =
-        PlayerListFrame
-
-    Instance.new(
-        "UICorner",
-        close
-    ).CornerRadius =
-        UDim.new(0, 7)
-
-    close.MouseButton1Click:Connect(function()
-
-        PlayerListGUI.Enabled = false
-
-    end)
-
-    --------------------------------------------------
-    -- SCROLL
-    --------------------------------------------------
-
-    local scroll =
-        Instance.new("ScrollingFrame")
-
-    scroll.Name =
-        "Players"
-
-    scroll.Size =
-        UDim2.new(
-            1,
-            -20,
-            1,
-            -60
-        )
+    local scroll = Instance.new("ScrollingFrame")
 
     scroll.Position =
-        UDim2.new(
-            0,
-            10,
-            0,
-            50
-        )
+        UDim2.new(0, 0, 0, 28)
+
+    scroll.Size =
+        UDim2.new(1, 0, 1, -28)
 
     scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 4
 
-    scroll.Parent =
-        PlayerListFrame
+    scroll.ScrollBarThickness = 3
+
+    scroll.Parent = listFrame
 
     local layout =
         Instance.new("UIListLayout")
 
     layout.Padding =
-        UDim.new(0, 6)
+        UDim.new(0, 4)
 
-    layout.Parent =
-        scroll
+    layout.Parent = scroll
 
-    --------------------------------------------------
-    -- REFRESH
-    --------------------------------------------------
-
-    local function RefreshPlayerList()
+    local function Refresh()
 
         for _, child in ipairs(
             scroll:GetChildren()
@@ -1306,57 +937,75 @@ local function CreatePlayerList()
 
             if player ~= LP then
 
-                local role =
-                    GetRole(player)
-
-                local color =
-                    GetRoleColor(role)
-
                 local button =
                     Instance.new("TextButton")
 
                 button.Size =
-                    UDim2.new(
-                        1,
-                        -5,
-                        0,
-                        48
-                    )
+                    UDim2.new(1, 0, 0, 30)
 
                 button.BackgroundColor3 =
                     Color3.fromRGB(
-                        27,
-                        27,
-                        34
+                        30,
+                        30,
+                        35
                     )
 
+                button.Text =
+                    player.DisplayName
+
                 button.TextColor3 =
-                    color
+                    Color3.fromRGB(
+                        220,
+                        220,
+                        220
+                    )
 
                 button.Font =
-                    Enum.Font.GothamBold
+                    Enum.Font.Gotham
 
-                button.TextSize = 12
+                button.TextSize = 11
 
-                button.Text =
-                    player.DisplayName ..
-                    "\n[" ..
-                    role ..
-                    "]"
-
-                button.Parent =
-                    scroll
+                button.Parent = scroll
 
                 Instance.new(
                     "UICorner",
                     button
-                ).CornerRadius =
-                    UDim.new(0, 7)
+                )
 
                 button.MouseButton1Click:Connect(
                     function()
 
-                        SpectatePlayer(player)
+                        local character =
+                            player.Character
+
+                        local humanoid =
+                            character
+                            and character:FindFirstChildOfClass(
+                                "Humanoid"
+                            )
+
+                        if humanoid then
+
+                            workspace.CurrentCamera.CameraSubject =
+                                humanoid
+
+                            Settings.SpectatedPlayer =
+                                player
+
+                            Settings.Spectating =
+                                true
+
+                            Notify(
+                                "Spectating: "
+                                .. player.DisplayName,
+                                Color3.fromRGB(
+                                    120,
+                                    50,
+                                    255
+                                )
+                            )
+
+                        end
 
                     end
                 )
@@ -1365,38 +1014,12 @@ local function CreatePlayerList()
 
         end
 
-        task.wait()
-
-        scroll.CanvasSize =
-            UDim2.new(
-                0,
-                0,
-                0,
-                layout.AbsoluteContentSize.Y + 10
-            )
-
     end
 
-    --------------------------------------------------
+    Refresh()
 
-    task.spawn(function()
-
-        while PlayerListGUI
-            and PlayerListGUI.Parent do
-
-            if PlayerListGUI.Enabled then
-
-                RefreshPlayerList()
-
-            end
-
-            task.wait(0.7)
-
-        end
-
-    end)
-
-    PlayerListGUI.Enabled = true
+    Players.PlayerAdded:Connect(Refresh)
+    Players.PlayerRemoving:Connect(Refresh)
 
 end
 
@@ -1406,66 +1029,57 @@ end
 
 local function BuildUI()
 
-    if MainGUI then
+    local old =
+        pg:FindFirstChild("Fondi_V4")
 
-        MainGUI.Enabled = true
-        return
-
+    if old then
+        old:Destroy()
     end
 
-    MainGUI =
+    local sg =
         Instance.new("ScreenGui")
 
-    MainGUI.Name =
-        "Fondi_V41"
+    sg.Name = "Fondi_V4"
 
-    MainGUI.ResetOnSpawn = false
-    MainGUI.Parent = pg
+    sg.ResetOnSpawn = false
+
+    sg.Parent = pg
 
     --------------------------------------------------
+    -- MAIN
+    --------------------------------------------------
 
-    MainFrame =
+    local main =
         Instance.new("Frame")
 
-    MainFrame.Size =
-        UDim2.new(
-            0,
-            310,
-            0,
-            450
-        )
+    main.Size =
+        UDim2.new(0, 280, 0, 420)
 
-    MainFrame.Position =
+    main.Position =
         UDim2.new(
             0.5,
-            -155,
+            -140,
             0.5,
-            -225
+            -210
         )
 
-    MainFrame.BackgroundColor3 =
+    main.BackgroundColor3 =
         Color3.fromRGB(
-            14,
-            14,
+            15,
+            15,
             20
         )
 
-    MainFrame.Active = true
-    MainFrame.Draggable = true
+    main.Active = true
 
-    MainFrame.Parent =
-        MainGUI
+    main.Draggable = true
 
-    --------------------------------------------------
+    main.Parent = sg
 
-    local corner =
-        Instance.new("UICorner")
-
-    corner.CornerRadius =
-        UDim.new(0, 12)
-
-    corner.Parent =
-        MainFrame
+    Instance.new(
+        "UICorner",
+        main
+    )
 
     local stroke =
         Instance.new("UIStroke")
@@ -1479,8 +1093,7 @@ local function BuildUI()
 
     stroke.Thickness = 2
 
-    stroke.Parent =
-        MainFrame
+    stroke.Parent = main
 
     --------------------------------------------------
     -- TITLE
@@ -1492,9 +1105,17 @@ local function BuildUI()
     title.Size =
         UDim2.new(
             1,
+            -20,
             0,
+            40
+        )
+
+    title.Position =
+        UDim2.new(
             0,
-            55
+            10,
+            0,
+            5
         )
 
     title.BackgroundTransparency = 1
@@ -1503,15 +1124,18 @@ local function BuildUI()
         "FONDI MM2 V4.1"
 
     title.TextColor3 =
-        Color3.new(1, 1, 1)
+        Color3.fromRGB(
+            180,
+            100,
+            255
+        )
 
     title.Font =
-        Enum.Font.GothamBlack
+        Enum.Font.GothamBold
 
-    title.TextSize = 18
+    title.TextSize = 17
 
-    title.Parent =
-        MainFrame
+    title.Parent = main
 
     --------------------------------------------------
     -- SCROLL
@@ -1525,7 +1149,7 @@ local function BuildUI()
             1,
             -20,
             1,
-            -70
+            -55
         )
 
     scroll.Position =
@@ -1533,15 +1157,14 @@ local function BuildUI()
             0,
             10,
             0,
-            60
+            50
         )
 
     scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0
+
     scroll.ScrollBarThickness = 3
 
-    scroll.Parent =
-        MainFrame
+    scroll.Parent = main
 
     local layout =
         Instance.new("UIListLayout")
@@ -1549,8 +1172,7 @@ local function BuildUI()
     layout.Padding =
         UDim.new(0, 7)
 
-    layout.Parent =
-        scroll
+    layout.Parent = scroll
 
     --------------------------------------------------
     -- TOGGLE
@@ -1558,7 +1180,7 @@ local function BuildUI()
 
     local function CreateToggle(
         name,
-        setting
+        variable
     )
 
         local button =
@@ -1569,115 +1191,179 @@ local function BuildUI()
                 1,
                 -5,
                 0,
-                43
+                42
             )
 
         button.BackgroundColor3 =
-            Color3.fromRGB(
-                28,
-                28,
+            Settings[variable]
+            and Color3.fromRGB(
+                120,
+                50,
+                255
+            )
+            or Color3.fromRGB(
+                30,
+                30,
                 35
             )
 
+        button.Text =
+            name
+            .. " : "
+            .. (
+                Settings[variable]
+                and "ON"
+                or "OFF"
+            )
+
         button.TextColor3 =
-            Color3.new(1, 1, 1)
+            Color3.new(
+                1,
+                1,
+                1
+            )
 
         button.Font =
             Enum.Font.GothamBold
 
-        button.TextSize = 12
+        button.TextSize = 11
 
-        button.Parent =
-            scroll
+        button.Parent = scroll
 
         Instance.new(
             "UICorner",
             button
-        ).CornerRadius =
-            UDim.new(0, 8)
-
-        local function Refresh()
-
-            local enabled =
-                Settings[setting]
-
-            button.Text =
-                name ..
-                " : " ..
-                (
-                    enabled
-                    and "ON"
-                    or "OFF"
-                )
-
-            if enabled then
-
-                button.BackgroundColor3 =
-                    Color3.fromRGB(
-                        90,
-                        40,
-                        180
-                    )
-
-            else
-
-                button.BackgroundColor3 =
-                    Color3.fromRGB(
-                        28,
-                        28,
-                        35
-                    )
-
-            end
-
-        end
-
-        Refresh()
+        )
 
         button.MouseButton1Click:Connect(
             function()
 
-                Settings[setting] =
-                    not Settings[setting]
+                Settings[variable] =
+                    not Settings[variable]
 
-                Refresh()
+                button.Text =
+                    name
+                    .. " : "
+                    .. (
+                        Settings[variable]
+                        and "ON"
+                        or "OFF"
+                    )
 
-                if setting == "Fly"
-                    and not Settings.Fly then
+                local targetColor =
+                    Settings[variable]
+                    and Color3.fromRGB(
+                        120,
+                        50,
+                        255
+                    )
+                    or Color3.fromRGB(
+                        30,
+                        30,
+                        35
+                    )
 
-                    StopFly()
-
-                end
+                TweenService:Create(
+                    button,
+                    TweenInfo.new(0.25),
+                    {
+                        BackgroundColor3 =
+                            targetColor
+                    }
+                ):Play()
 
                 Notify(
-                    name ..
-                    ": " ..
-                    (
-                        Settings[setting]
+                    name
+                    .. ": "
+                    .. (
+                        Settings[variable]
                         and "ВКЛ"
                         or "ВЫКЛ"
                     ),
-                    Settings[setting]
+                    Settings[variable]
                     and Color3.fromRGB(
-                        70,
+                        0,
                         255,
-                        120
+                        100
                     )
                     or Color3.fromRGB(
                         255,
-                        70,
-                        70
+                        60,
+                        60
                     )
                 )
+
+                --------------------------------------------------
+                -- ESP REFRESH
+                --------------------------------------------------
+
+                if variable == "ESP" then
+
+                    for _, player in ipairs(
+                        Players:GetPlayers()
+                    ) do
+
+                        if player ~= LP then
+
+                            if Settings.ESP then
+                                CreateESP(player)
+                            else
+                                RemoveESP(player)
+                            end
+
+                        end
+
+                    end
+
+                end
+
+                --------------------------------------------------
+                -- OUTLINE
+                --------------------------------------------------
+
+                if variable == "Outline" then
+
+                    for _, data in pairs(
+                        ESPObjects
+                    ) do
+
+                        if data.Highlight then
+
+                            data.Highlight.OutlineTransparency =
+                                Settings.Outline
+                                and 0
+                                or 1
+
+                        end
+
+                    end
+
+                end
+
+                --------------------------------------------------
+                -- TRACERS
+                --------------------------------------------------
+
+                if variable == "Tracers" then
+
+                    for _, player in ipairs(
+                        Players:GetPlayers()
+                    ) do
+
+                        if player ~= LP then
+                            UpdateESP(player)
+                        end
+
+                    end
+
+                end
 
             end
         )
 
-    end
+        return button
 
-    --------------------------------------------------
-    -- SETTINGS
-    --------------------------------------------------
+    end
 
     CreateToggle(
         "ESP",
@@ -1687,6 +1373,11 @@ local function BuildUI()
     CreateToggle(
         "OUTLINE",
         "Outline"
+    )
+
+    CreateToggle(
+        "TRACERS",
+        "Tracers"
     )
 
     CreateToggle(
@@ -1710,366 +1401,43 @@ local function BuildUI()
     )
 
     --------------------------------------------------
-    -- PLAYER LIST BUTTON
+    -- PLAYER LIST
     --------------------------------------------------
 
-    local playerListButton =
-        Instance.new("TextButton")
-
-    playerListButton.Size =
-        UDim2.new(
-            1,
-            -5,
-            0,
-            43
-        )
-
-    playerListButton.BackgroundColor3 =
-        Color3.fromRGB(
-            28,
-            28,
-            35
-        )
-
-    playerListButton.Text =
-        "PLAYER LIST"
-
-    playerListButton.TextColor3 =
-        Color3.new(1, 1, 1)
-
-    playerListButton.Font =
-        Enum.Font.GothamBold
-
-    playerListButton.TextSize = 12
-
-    playerListButton.Parent =
-        scroll
-
-    Instance.new(
-        "UICorner",
-        playerListButton
-    ).CornerRadius =
-        UDim.new(0, 8)
-
-    playerListButton.MouseButton1Click:Connect(
-        function()
-
-            CreatePlayerList()
-
-        end
-    )
-
-    --------------------------------------------------
-    -- STOP SPECTATE
-    --------------------------------------------------
-
-    local stopSpectate =
-        Instance.new("TextButton")
-
-    stopSpectate.Size =
-        UDim2.new(
-            1,
-            -5,
-            0,
-            43
-        )
-
-    stopSpectate.BackgroundColor3 =
-        Color3.fromRGB(
-            28,
-            28,
-            35
-        )
-
-    stopSpectate.Text =
-        "STOP SPECTATING"
-
-    stopSpectate.TextColor3 =
-        Color3.new(1, 1, 1)
-
-    stopSpectate.Font =
-        Enum.Font.GothamBold
-
-    stopSpectate.TextSize = 12
-
-    stopSpectate.Parent =
-        scroll
-
-    Instance.new(
-        "UICorner",
-        stopSpectate
-    ).CornerRadius =
-        UDim.new(0, 8)
-
-    stopSpectate.MouseButton1Click:Connect(
-        function()
-
-            StopSpectating()
-
-        end
-    )
-
-    --------------------------------------------------
-    -- FLY SPEED
-    --------------------------------------------------
-
-    local speedBox =
-        Instance.new("TextBox")
-
-    speedBox.Size =
-        UDim2.new(
-            1,
-            -5,
-            0,
-            43
-        )
-
-    speedBox.BackgroundColor3 =
-        Color3.fromRGB(
-            28,
-            28,
-            35
-        )
-
-    speedBox.TextColor3 =
-        Color3.new(1, 1, 1)
-
-    speedBox.PlaceholderText =
-        "Fly Speed: 50"
-
-    speedBox.Text = ""
-
-    speedBox.ClearTextOnFocus = false
-
-    speedBox.Font =
-        Enum.Font.GothamBold
-
-    speedBox.TextSize = 12
-
-    speedBox.Parent =
-        scroll
-
-    Instance.new(
-        "UICorner",
-        speedBox
-    ).CornerRadius =
-        UDim.new(0, 8)
-
-    speedBox.FocusLost:Connect(
-        function()
-
-            local value =
-                tonumber(
-                    speedBox.Text
-                )
-
-            if value then
-
-                Settings.FlySpeed =
-                    math.clamp(
-                        value,
-                        1,
-                        500
-                    )
-
-                Notify(
-                    "Fly Speed: " ..
-                    Settings.FlySpeed,
-                    Color3.fromRGB(
-                        120,
-                        50,
-                        255
-                    )
-                )
-
-            end
-
-            speedBox.Text = ""
-
-        end
-    )
-
-    --------------------------------------------------
-
-    task.wait()
-
-    scroll.CanvasSize =
-        UDim2.new(
-            0,
-            0,
-            0,
-            layout.AbsoluteContentSize.Y + 15
-        )
+    CreatePlayerList(scroll)
 
 end
-
---------------------------------------------------
--- HOTKEYS
---------------------------------------------------
-
-UIS.InputBegan:Connect(
-    function(input, processed)
-
-        if processed then
-            return
-        end
-
-        if not IsAuthenticated then
-            return
-        end
-
-        --------------------------------------------------
-        -- MENU
-        --------------------------------------------------
-
-        if input.KeyCode ==
-            Settings.MenuKey then
-
-            if MainGUI then
-
-                MainGUI.Enabled =
-                    not MainGUI.Enabled
-
-            end
-
-        --------------------------------------------------
-        -- FLY
-        --------------------------------------------------
-
-        elseif input.KeyCode ==
-            Settings.FlyKey then
-
-            Settings.Fly =
-                not Settings.Fly
-
-            if not Settings.Fly then
-                StopFly()
-            end
-
-            Notify(
-                "Fly: " ..
-                (
-                    Settings.Fly
-                    and "ВКЛ"
-                    or "ВЫКЛ"
-                ),
-                Settings.Fly
-                and Color3.fromRGB(
-                    70,
-                    255,
-                    120
-                )
-                or Color3.fromRGB(
-                    255,
-                    70,
-                    70
-                )
-            )
-
-        --------------------------------------------------
-        -- NOCLIP
-        --------------------------------------------------
-
-        elseif input.KeyCode ==
-            Settings.NoclipKey then
-
-            Settings.Noclip =
-                not Settings.Noclip
-
-            Notify(
-                "Noclip: " ..
-                (
-                    Settings.Noclip
-                    and "ВКЛ"
-                    or "ВЫКЛ"
-                ),
-                Settings.Noclip
-                and Color3.fromRGB(
-                    70,
-                    255,
-                    120
-                )
-                or Color3.fromRGB(
-                    255,
-                    70,
-                    70
-                )
-            )
-
-        --------------------------------------------------
-        -- PLAYER LIST
-        --------------------------------------------------
-
-        elseif input.KeyCode ==
-            Settings.PlayerListKey then
-
-            CreatePlayerList()
-
-            if PlayerListGUI then
-
-                PlayerListGUI.Enabled =
-                    not PlayerListGUI.Enabled
-
-            end
-
-        --------------------------------------------------
-        -- SPECTATOR
-        --------------------------------------------------
-
-        elseif input.KeyCode ==
-            Settings.SpectatorKey then
-
-            if Settings.Spectating then
-
-                StopSpectating()
-
-            else
-
-                CreatePlayerList()
-
-                Notify(
-                    "Выбери игрока",
-                    Color3.fromRGB(
-                        120,
-                        50,
-                        255
-                    )
-                )
-
-            end
-
-        end
-
-    end
-)
 
 --------------------------------------------------
 -- KEY GUI
 --------------------------------------------------
 
-local KeyGUI =
+local keyGui =
     Instance.new("ScreenGui")
 
-KeyGUI.Name =
-    "Fondi_Key"
+keyGui.Name =
+    "Fondi_KeyGui"
 
-KeyGUI.ResetOnSpawn = false
-KeyGUI.Parent = pg
+keyGui.ResetOnSpawn = false
+
+keyGui.Parent = pg
 
 --------------------------------------------------
+-- KEY FRAME
+--------------------------------------------------
 
-local KeyFrame =
+local kFrame =
     Instance.new("Frame")
 
-KeyFrame.Size =
+kFrame.Size =
     UDim2.new(
         0,
         320,
         0,
-        190
+        180
     )
 
-KeyFrame.Position =
+kFrame.Position =
     UDim2.new(
         0.5,
         -160,
@@ -2077,40 +1445,36 @@ KeyFrame.Position =
         0
     )
 
-KeyFrame.BackgroundColor3 =
+kFrame.BackgroundColor3 =
     Color3.fromRGB(
-        14,
-        14,
+        15,
+        15,
         20
     )
 
-KeyFrame.Parent =
-    KeyGUI
+kFrame.Parent = keyGui
 
-local keyCorner =
-    Instance.new("UICorner")
+Instance.new(
+    "UICorner",
+    kFrame
+)
 
-keyCorner.CornerRadius =
-    UDim.new(0, 12)
-
-keyCorner.Parent =
-    KeyFrame
-
-local keyStroke =
+local kStroke =
     Instance.new("UIStroke")
 
-keyStroke.Color =
+kStroke.Color =
     Color3.fromRGB(
         120,
         50,
         255
     )
 
-keyStroke.Thickness = 2
+kStroke.Thickness = 2
 
-keyStroke.Parent =
-    KeyFrame
+kStroke.Parent = kFrame
 
+--------------------------------------------------
+-- KEY TITLE
 --------------------------------------------------
 
 local keyTitle =
@@ -2130,22 +1494,27 @@ keyTitle.Text =
     "FONDI MM2"
 
 keyTitle.TextColor3 =
-    Color3.new(1, 1, 1)
+    Color3.fromRGB(
+        180,
+        100,
+        255
+    )
 
 keyTitle.Font =
-    Enum.Font.GothamBlack
+    Enum.Font.GothamBold
 
 keyTitle.TextSize = 18
 
-keyTitle.Parent =
-    KeyFrame
+keyTitle.Parent = kFrame
 
 --------------------------------------------------
+-- KEY BOX
+--------------------------------------------------
 
-local keyBox =
+local box =
     Instance.new("TextBox")
 
-keyBox.Size =
+box.Size =
     UDim2.new(
         0.8,
         0,
@@ -2153,47 +1522,51 @@ keyBox.Size =
         40
     )
 
-keyBox.Position =
+box.Position =
     UDim2.new(
         0.1,
         0,
-        0.28,
+        0.3,
         0
     )
 
-keyBox.PlaceholderText =
+box.PlaceholderText =
     "ВВЕДИТЕ КЛЮЧ"
 
-keyBox.BackgroundColor3 =
+box.BackgroundColor3 =
     Color3.fromRGB(
-        8,
-        8,
-        12
+        10,
+        10,
+        10
     )
 
-keyBox.TextColor3 =
-    Color3.new(1, 1, 1)
+box.TextColor3 =
+    Color3.new(
+        1,
+        1,
+        1
+    )
 
-keyBox.Font =
-    Enum.Font.GothamBold
+box.Font =
+    Enum.Font.Gotham
 
-keyBox.TextSize = 12
+box.TextSize = 13
 
-keyBox.Parent =
-    KeyFrame
+box.Parent = kFrame
 
 Instance.new(
     "UICorner",
-    keyBox
-).CornerRadius =
-    UDim.new(0, 7)
+    box
+)
 
 --------------------------------------------------
+-- ACTIVATE
+--------------------------------------------------
 
-local keyButton =
+local btn =
     Instance.new("TextButton")
 
-keyButton.Size =
+btn.Size =
     UDim2.new(
         0.8,
         0,
@@ -2201,78 +1574,104 @@ keyButton.Size =
         40
     )
 
-keyButton.Position =
+btn.Position =
     UDim2.new(
         0.1,
         0,
-        0.57,
+        0.58,
         0
     )
 
-keyButton.Text =
+btn.Text =
     "АКТИВИРОВАТЬ"
 
-keyButton.BackgroundColor3 =
+btn.BackgroundColor3 =
     Color3.fromRGB(
         120,
         50,
         255
     )
 
-keyButton.TextColor3 =
-    Color3.new(1, 1, 1)
+btn.TextColor3 =
+    Color3.new(
+        1,
+        1,
+        1
+    )
 
-keyButton.Font =
+btn.Font =
     Enum.Font.GothamBold
 
-keyButton.TextSize = 12
+btn.TextSize = 12
 
-keyButton.Parent =
-    KeyFrame
+btn.Parent = kFrame
 
 Instance.new(
     "UICorner",
-    keyButton
-).CornerRadius =
-    UDim.new(0, 7)
+    btn
+)
 
 --------------------------------------------------
 -- AUTH
 --------------------------------------------------
 
-keyButton.MouseButton1Click:Connect(
+btn.MouseButton1Click:Connect(
     function()
 
-        if keyBox.Text == KEY then
+        if box.Text == KEY then
 
             IsAuthenticated = true
 
-            KeyGUI:Destroy()
+            print(
+                "[FONDI_AUTH]: Доступ разрешен."
+            )
+
+            keyGui:Destroy()
 
             BuildUI()
 
             Notify(
-                "FONDI MM2 V4.1 LOADED",
+                "FONDI LOADED",
                 Color3.fromRGB(
-                    70,
+                    0,
                     255,
-                    120
+                    100
                 )
             )
 
+            --------------------------------------------------
+            -- INITIAL ESP
+            --------------------------------------------------
+
+            task.wait(0.5)
+
+            for _, player in ipairs(
+                Players:GetPlayers()
+            ) do
+
+                if player ~= LP then
+                    CreateESP(player)
+                end
+
+            end
+
         else
 
-            keyBox.Text = ""
+            print(
+                "[FONDI_AUTH]: Неверный ключ."
+            )
 
-            keyBox.PlaceholderText =
+            box.Text = ""
+
+            box.PlaceholderText =
                 "НЕВЕРНЫЙ КЛЮЧ!"
 
             Notify(
                 "Неверный ключ",
                 Color3.fromRGB(
                     255,
-                    60,
-                    60
+                    50,
+                    50
                 )
             )
 
@@ -2280,17 +1679,3 @@ keyButton.MouseButton1Click:Connect(
 
     end
 )
-
---------------------------------------------------
--- FINAL
---------------------------------------------------
-
-print("================================")
-print(" FONDI MM2 V4.1")
-print(" ROUND-SAFE ESP")
-print(" PLAYER LIST")
-print(" SPECTATOR")
-print(" FLY")
-print(" NOCLIP")
-print(" HIGHLIGHT")
-print("================================")
