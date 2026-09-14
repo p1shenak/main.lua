@@ -1,12 +1,14 @@
 --[[
-    FONDI MM2 V6.5 // RU/EN
-    - Переключение языка RU/EN кнопкой
-    - Fly через CFrame + Velocity lock
-    - Noclip через CanCollide
-    - Автосохранение ключа
-    - Online key auth
-    - ESP / Outline / Tracers / Names / Roles
-    - Hotkeys: [L] menu, [F] Fly, [N] Noclip
+    FONDI MM2 V7.0 // EXTENDED
+    - Kill Aura / Auto-Stab (с ползунком дистанции)
+    - Coin/Gem Farm (авто-подлёт с Fly+Noclip)
+    - Bhop (auto-bhop)
+    - Anti-Fling (защита от флинга)
+    - Kill/Sheriff Notification
+    - Fly / Noclip / ESP / Outline / Tracers
+    - RU/EN переключение
+    - Автосохранение сессии
+    - Hotkeys: [L] menu, [F] Fly, [N] Noclip, [B] Bhop, [K] KillAura, [G] Farm
 ]]
 
 --==================================================
@@ -38,7 +40,13 @@ local Settings = {
     ESP = false, Outline = true, Tracers = true,
     ShowNames = true, ShowRoles = true,
     Fly = false, Noclip = false, FlySpeed = 55,
-    Spectator = false
+    Spectator = false,
+    Bhop = false,
+    AntiFling = false,
+    KillAura = false,
+    KillAuraRange = 12,   -- studs
+    Farm = false,          -- Coin/Gem Farm
+    Notifications = true   -- Kill/Sheriff уведомления
 }
 
 local IsAuthenticated = false
@@ -71,6 +79,12 @@ local I18N = {
         names = "NAMES", roles = "ROLES",
         fly = "FLY [F]", noclip = "NOCLIP [N]",
         spectator = "SPECTATOR",
+        bhop = "BHOP [B]",
+        antiFling = "ANTI-FLING",
+        killAura = "KILL AURA [K]",
+        killAuraRange = "РАДИУС: ",
+        farm = "FARM [G]",
+        notifications = "УВЕДОМЛЕНИЯ",
         playerList = "PLAYER LIST",
         menuTitle = "FONDI MM2",
         on = "ВКЛ", off = "ВЫКЛ",
@@ -100,15 +114,32 @@ local I18N = {
         invalidKey = "Неверный ключ",
         flightOn = "FLY: ВКЛ", flightOff = "FLY: ВЫКЛ",
         noclipOn = "NOCLIP: ВКЛ", noclipOff = "NOCLIP: ВЫКЛ",
+        bhopOn = "BHOP: ВКЛ", bhopOff = "BHOP: ВЫКЛ",
+        antiFlingOn = "ANTI-FLING: ВКЛ", antiFlingOff = "ANTI-FLING: ВЫКЛ",
+        killAuraOn = "KILL AURA: ВКЛ", killAuraOff = "KILL AURA: ВЫКЛ",
+        farmOn = "FARM: ВКЛ", farmOff = "FARM: ВЫКЛ",
         langBtn = "EN",
         clipUnavailable = "setclipboard недоступен",
-        autologinText = "АВТОВХОД..."
+        autologinText = "АВТОВХОД...",
+        becameMurderer = " стал MURDERER",
+        becameSheriff = " стал SHERIFF",
+        wasKilled = " был убит",
+        noWeapon = "Нет оружия в руках",
+        coinFound = "Найдена монета, лечу...",
+        noCoins = "Монет нет на карте",
+        antiFlingWarn = "Anti-Fling: обнаружен флинг!"
     },
     en = {
         esp = "ESP", outline = "OUTLINE", tracers = "TRACERS",
         names = "NAMES", roles = "ROLES",
         fly = "FLY [F]", noclip = "NOCLIP [N]",
         spectator = "SPECTATOR",
+        bhop = "BHOP [B]",
+        antiFling = "ANTI-FLING",
+        killAura = "KILL AURA [K]",
+        killAuraRange = "RANGE: ",
+        farm = "FARM [G]",
+        notifications = "NOTIFICATIONS",
         playerList = "PLAYER LIST",
         menuTitle = "FONDI MM2",
         on = "ON", off = "OFF",
@@ -138,9 +169,20 @@ local I18N = {
         invalidKey = "Invalid key",
         flightOn = "FLY: ON", flightOff = "FLY: OFF",
         noclipOn = "NOCLIP: ON", noclipOff = "NOCLIP: OFF",
+        bhopOn = "BHOP: ON", bhopOff = "BHOP: OFF",
+        antiFlingOn = "ANTI-FLING: ON", antiFlingOff = "ANTI-FLING: OFF",
+        killAuraOn = "KILL AURA: ON", killAuraOff = "KILL AURA: OFF",
+        farmOn = "FARM: ON", farmOff = "FARM: OFF",
         langBtn = "RU",
         clipUnavailable = "setclipboard unavailable",
-        autologinText = "AUTO-LOGIN..."
+        autologinText = "AUTO-LOGIN...",
+        becameMurderer = " became MURDERER",
+        becameSheriff = " became SHERIFF",
+        wasKilled = " was killed",
+        noWeapon = "No weapon in hand",
+        coinFound = "Coin found, flying...",
+        noCoins = "No coins on map",
+        antiFlingWarn = "Anti-Fling: fling detected!"
     }
 }
 
@@ -208,10 +250,7 @@ end
 
 local function ValidateKey(key)
     local data, err = HttpPost(AUTH_URL, {
-        key = key,
-        userId = tostring(LP.UserId),
-        hwid = GetHWID(),
-        lang = Lang
+        key = key, userId = tostring(LP.UserId), hwid = GetHWID(), lang = Lang
     })
     if not data then return false, err end
     if data.valid then return true, data end
@@ -220,9 +259,7 @@ end
 
 local function GenerateKeyRemote(duration)
     local data, err = HttpPost(GENERATE_URL, {
-        duration = duration,
-        userId = tostring(LP.UserId),
-        lang = Lang
+        duration = duration, userId = tostring(LP.UserId), lang = Lang
     })
     if not data then return nil, err end
     if data.error then return nil, data.error end
@@ -233,9 +270,7 @@ end
 -- SESSION
 --==================================================
 local function SaveKey(key)
-    pcall(function()
-        if writefile then writefile(KEY_FILE, key) end
-    end)
+    pcall(function() if writefile then writefile(KEY_FILE, key) end end)
 end
 
 local function LoadKey()
@@ -248,15 +283,11 @@ local function LoadKey()
 end
 
 local function ClearKey()
-    pcall(function()
-        if delfile and isfile and isfile(KEY_FILE) then delfile(KEY_FILE) end
-    end)
+    pcall(function() if delfile and isfile and isfile(KEY_FILE) then delfile(KEY_FILE) end end)
 end
 
 local function SaveLang(l)
-    pcall(function()
-        if writefile then writefile(LANG_FILE, l) end
-    end)
+    pcall(function() if writefile then writefile(LANG_FILE, l) end end)
 end
 
 local function LoadLang()
@@ -271,7 +302,8 @@ end
 --==================================================
 -- NOTIFY
 --==================================================
-local function Notify(text, color)
+local function Notify(text, color, duration)
+    duration = duration or 3
     local sg = pg:FindFirstChild("Fondi_Notify")
     if not sg then
         sg = Instance.new("ScreenGui")
@@ -313,7 +345,7 @@ local function Notify(text, color)
 
     Tween(frame, 0.35, {Position = UDim2.new(1, -300, 0.82, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
-    task.delay(3, function()
+    task.delay(duration, function()
         if frame and frame.Parent then
             Tween(frame, 0.3, {Position = UDim2.new(1, 20, 0.82, 0), BackgroundTransparency = 1}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
             Tween(label, 0.3, {TextTransparency = 1})
@@ -357,6 +389,7 @@ end
 local function GetRoleColor(role) return COLORS[role] or COLORS.Innocent end
 
 local ESPObjects, PlayerConnections = {}, {}
+local lastRoles = {}  -- для notification: player -> роль
 
 local function RemoveESP(player)
     local d = ESPObjects[player]
@@ -476,6 +509,27 @@ UpdateESP = function(player)
     end
 end
 
+--==================================================
+-- NOTIFICATION: Kill/Sheriff
+--==================================================
+local function CheckRoleChange(player)
+    if not Settings.Notifications then return end
+    if player == LP then return end
+    local role = GetRole(player)
+    local last = lastRoles[player]
+    if last ~= role then
+        lastRoles[player] = role
+        if role == "Murderer" and last ~= "Murderer" then
+            Notify(player.DisplayName .. T("becameMurderer"), COLORS.Murderer)
+        elseif role == "Sheriff" and last ~= "Sheriff" then
+            Notify(player.DisplayName .. T("becameSheriff"), COLORS.Sheriff)
+        end
+    end
+end
+
+--==================================================
+-- SETUP PLAYERS
+--==================================================
 local function DisconnectPlayer(player)
     local c = PlayerConnections[player]
     if not c then return end
@@ -488,13 +542,33 @@ local function SetupPlayer(player)
     DisconnectPlayer(player)
     PlayerConnections[player] = {}
 
+    -- Отслеживание смерти
+    local function watchHumanoid(char)
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local diedConn = hum.Died:Connect(function()
+                if Settings.Notifications then
+                    local myChar = LP.Character
+                    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+                    -- Если умер не я и не от моей руки — уведомление
+                    if player ~= LP then
+                        Notify(player.DisplayName .. T("wasKilled"), COLORS.Dead, 2)
+                    end
+                end
+            end)
+            table.insert(PlayerConnections[player], diedConn)
+        end
+    end
+
     local ca = player.CharacterAdded:Connect(function(char)
         RemoveESP(player)
         char:WaitForChild("HumanoidRootPart", 10)
+        watchHumanoid(char)
         task.wait(0.25)
         if player.Parent and player.Character == char and Settings.ESP then
             CreateESP(player)
         end
+        CheckRoleChange(player)
     end)
     table.insert(PlayerConnections[player], ca)
 
@@ -506,8 +580,16 @@ local function SetupPlayer(player)
 
     local bp = player:FindFirstChildOfClass("Backpack")
     if bp then
-        local a = bp.ChildAdded:Connect(function() task.wait(0.05); if Settings.ESP then UpdateESP(player) end end)
-        local r = bp.ChildRemoved:Connect(function() task.wait(0.05); if Settings.ESP then UpdateESP(player) end end)
+        local a = bp.ChildAdded:Connect(function()
+            task.wait(0.05)
+            if Settings.ESP then UpdateESP(player) end
+            CheckRoleChange(player)
+        end)
+        local r = bp.ChildRemoved:Connect(function()
+            task.wait(0.05)
+            if Settings.ESP then UpdateESP(player) end
+            CheckRoleChange(player)
+        end)
         table.insert(PlayerConnections[player], a)
         table.insert(PlayerConnections[player], r)
     end
@@ -516,10 +598,12 @@ local function SetupPlayer(player)
         task.spawn(function()
             local char = player.Character
             char:WaitForChild("HumanoidRootPart", 5)
+            watchHumanoid(char)
             if player.Character == char and Settings.ESP then
                 task.wait(0.2)
                 CreateESP(player)
             end
+            CheckRoleChange(player)
         end)
     end
 end
@@ -532,20 +616,24 @@ Players.PlayerAdded:Connect(SetupPlayer)
 Players.PlayerRemoving:Connect(function(p)
     RemoveESP(p)
     DisconnectPlayer(p)
+    lastRoles[p] = nil
 end)
 
 task.spawn(function()
     while task.wait(0.5) do
-        if Settings.ESP and IsAuthenticated then
+        if IsAuthenticated then
             for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Parent and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                    local d = ESPObjects[p]
-                    if not d or d.Character ~= p.Character
-                        or not d.Highlight or not d.Highlight.Parent
-                        or not d.Billboard or not d.Billboard.Parent then
-                        CreateESP(p)
-                    else
-                        UpdateESP(p)
+                if p ~= LP and p.Parent then
+                    CheckRoleChange(p)
+                    if Settings.ESP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local d = ESPObjects[p]
+                        if not d or d.Character ~= p.Character
+                            or not d.Highlight or not d.Highlight.Parent
+                            or not d.Billboard or not d.Billboard.Parent then
+                            CreateESP(p)
+                        else
+                            UpdateESP(p)
+                        end
                     end
                 end
             end
@@ -654,6 +742,201 @@ LP.CharacterAdded:Connect(function()
 end)
 
 --==================================================
+-- BHOP
+--==================================================
+local bhopConnection = nil
+
+local function StopBhop()
+    if bhopConnection then
+        bhopConnection:Disconnect()
+        bhopConnection = nil
+    end
+end
+
+local function StartBhop()
+    StopBhop()
+    bhopConnection = RunService.Heartbeat:Connect(function()
+        if not IsAuthenticated or not Settings.Bhop then return end
+        if not UIS:IsKeyDown(Enum.KeyCode.Space) then return end
+        local c = LP.Character
+        if not c then return end
+        local h = c:FindFirstChildOfClass("Humanoid")
+        local r = c:FindFirstChild("HumanoidRootPart")
+        if h and r and h.FloorMaterial ~= Enum.Material.Air then
+            h.Jump = true
+            r.Velocity = r.Velocity + (h.MoveDirection * 4)
+        end
+    end)
+end
+
+--==================================================
+-- ANTI-FLING
+--==================================================
+local antiflingConnection = nil
+
+local function StopAntiFling()
+    if antiflingConnection then
+        antiflingConnection:Disconnect()
+        antiflingConnection = nil
+    end
+end
+
+local function StartAntiFling()
+    StopAntiFling()
+    antiflingConnection = RunService.Heartbeat:Connect(function()
+        if not IsAuthenticated or not Settings.AntiFling then return end
+        local c = LP.Character
+        if not c then return end
+        local r = c:FindFirstChild("HumanoidRootPart")
+        if not r then return end
+        -- Если есть подозрительные силы / velocity
+        if r.Velocity.Magnitude > 200 or r.RotVelocity.Magnitude > 100 then
+            r.Velocity = Vector3.zero
+            r.RotVelocity = Vector3.zero
+        end
+    end)
+end
+
+--==================================================
+-- KILL AURA
+--==================================================
+local killAuraConnection = nil
+
+local function GetWeapon()
+    local char = LP.Character
+    if not char then return nil end
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") then
+            if tool.Name == "Knife" or tool.Name == "Gun" or tool.Name == "Revolver" then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+local function StopKillAura()
+    if killAuraConnection then
+        killAuraConnection:Disconnect()
+        killAuraConnection = nil
+    end
+end
+
+local function StartKillAura()
+    StopKillAura()
+    killAuraConnection = RunService.Heartbeat:Connect(function()
+        if not IsAuthenticated or not Settings.KillAura then return end
+        local char = LP.Character
+        if not char then return end
+        local myRoot = char:FindFirstChild("HumanoidRootPart")
+        local myHum = char:FindFirstChildOfClass("Humanoid")
+        if not myRoot or not myHum then return end
+
+        local weapon = GetWeapon()
+        if not weapon then return end
+
+        -- Ищем ближайшего Murderer
+        local closest = nil
+        local minDist = Settings.KillAuraRange
+        for _, pl in ipairs(Players:GetPlayers()) do
+            if pl ~= LP and pl.Character then
+                local role = GetRole(pl)
+                if role == "Murderer" then
+                    local theirRoot = pl.Character:FindFirstChild("HumanoidRootPart")
+                    if theirRoot then
+                        local dist = (theirRoot.Position - myRoot.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            closest = pl
+                        end
+                    end
+                end
+            end
+        end
+
+        if closest and closest.Character then
+            local targetRoot = closest.Character:FindFirstChild("HumanoidRootPart")
+            if targetRoot then
+                -- Поворачиваемся к цели и атакуем
+                myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z))
+                pcall(function() weapon:Activate() end)
+            end
+        end
+    end)
+end
+
+--==================================================
+-- COIN / GEM FARM
+--==================================================
+local farmConnection = nil
+local originalFly = false
+local originalNoclip = false
+local originalFlySpeed = 55
+
+local function StopFarm()
+    if farmConnection then
+        farmConnection:Disconnect()
+        farmConnection = nil
+    end
+    -- Восстанавливаем исходные Fly/Noclip если ферма их включала
+    if originalFly ~= Settings.Fly then
+        Settings.Fly = originalFly
+        if Settings.Fly then StartFly() else StopFly() end
+    end
+    if originalNoclip ~= Settings.Noclip then
+        Settings.Noclip = originalNoclip
+        if Settings.Noclip then StartNoclip() else StopNoclip() end
+    end
+    Settings.FlySpeed = originalFlySpeed
+end
+
+local function FindClosestCoin()
+    local myChar = LP.Character
+    if not myChar then return nil end
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil end
+
+    local closest, minDist = nil, math.huge
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            local name = obj.Name:lower()
+            if name:find("coin") or name:find("gem") or name:find("money") then
+                local dist = (obj.Position - myRoot.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    closest = obj
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function StartFarm()
+    StopFarm()
+    originalFly = Settings.Fly
+    originalNoclip = Settings.Noclip
+    originalFlySpeed = Settings.FlySpeed
+
+    Settings.Fly = true
+    Settings.FlySpeed = 80
+    if not flyActive then StartFly() end
+
+    farmConnection = RunService.Heartbeat:Connect(function()
+        if not IsAuthenticated or not Settings.Farm then return end
+        local c = LP.Character
+        if not c then return end
+        local r = c:FindFirstChild("HumanoidRootPart")
+        if not r then return end
+
+        local coin = FindClosestCoin()
+        if coin then
+            r.CFrame = CFrame.new(coin.Position + Vector3.new(0, 2, 0))
+        end
+    end)
+end
+
+--==================================================
 -- KEY GUI
 --==================================================
 local KeyGui = Instance.new("ScreenGui")
@@ -678,7 +961,6 @@ KeyFrame.Active = true
 Corner(KeyFrame, 18)
 Stroke(KeyFrame, COLORS.Accent, 1.5)
 
--- Кнопка языка в окне ключа
 local keyLangBtn = Instance.new("TextButton", KeyFrame)
 keyLangBtn.Size = UDim2.new(0, 50, 0, 26)
 keyLangBtn.Position = UDim2.new(1, -62, 0, 10)
@@ -691,9 +973,6 @@ keyLangBtn.BorderSizePixel = 0
 keyLangBtn.AutoButtonColor = false
 Corner(keyLangBtn, 8)
 Stroke(keyLangBtn, COLORS.Accent2, 1)
-
-keyLangBtn.MouseEnter:Connect(function() Tween(keyLangBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
-keyLangBtn.MouseLeave:Connect(function() Tween(keyLangBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)}) end)
 
 local keyHeader = Instance.new("TextLabel", KeyFrame)
 keyHeader.Size = UDim2.new(1, 0, 0, 42)
@@ -708,7 +987,7 @@ local keySub = Instance.new("TextLabel", KeyFrame)
 keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 72)
 keySub.BackgroundTransparency = 1
-keySub.Text = "V6.5 • RU/EN"
+keySub.Text = "V7.0 • EXTENDED"
 keySub.TextColor3 = COLORS.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -856,29 +1135,6 @@ GetScriptBtn.MouseLeave:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundC
 KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
 Tween(KeyFrame, 0.5, {Position = UDim2.new(0.5, -200, 0.5, -265)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
--- Смена языка в окне ключа
-keyLangBtn.MouseButton1Click:Connect(function()
-    Lang = (Lang == "ru") and "en" or "ru"
-    SaveLang(Lang)
-    PlayToggleSound()
-
-    -- Обновляем тексты
-    keyLangBtn.Text = T("langBtn")
-    keyHeader.Text = T("menuTitle")
-    KeyBox.PlaceholderText = T("keyInput")
-    ActivateBtn.Text = T("activate")
-    genTitle.Text = T("genTitle")
-    GenBtn.Text = T("generate")
-    CopyBtn.Text = T("copyKey")
-    GetScriptBtn.Text = T("getScript")
-
-    -- Пересобираем главное меню
-    if MainGui and MainGui.Parent then
-        pcall(function() MainGui:Destroy() end)
-        BuildUI()
-    end
-end)
-
 local function CloseKeyGui()
     Tween(KeyFrame, 0.3, {
         Position = UDim2.new(0.5, -200, 0.5, -225),
@@ -898,7 +1154,6 @@ local function CloseKeyGui()
     BuildUI()
 end
 
--- AUTH
 ActivateBtn.MouseButton1Click:Connect(function()
     if KeyBox.Text == "" then Notify(T("keyInput"), COLORS.Warning); return end
     ActivateBtn.Text = T("checking")
@@ -925,7 +1180,6 @@ ActivateBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- GENERATE
 GenBtn.MouseButton1Click:Connect(function()
     GenBtn.Text = T("generating")
     GenBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
@@ -947,7 +1201,6 @@ GenBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- COPY KEY
 CopyBtn.MouseButton1Click:Connect(function()
     if KeyBox.Text == "" then Notify(T("noKey"), COLORS.Warning); return end
     if setclipboard then
@@ -961,7 +1214,6 @@ CopyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- GET SCRIPT
 GetScriptBtn.MouseButton1Click:Connect(function()
     if setclipboard then
         setclipboard(SITE_URL)
@@ -976,16 +1228,31 @@ GetScriptBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- AUTO-LOGIN
+keyLangBtn.MouseButton1Click:Connect(function()
+    Lang = (Lang == "ru") and "en" or "ru"
+    SaveLang(Lang)
+    PlayToggleSound()
+    keyLangBtn.Text = T("langBtn")
+    keyHeader.Text = T("menuTitle")
+    KeyBox.PlaceholderText = T("keyInput")
+    ActivateBtn.Text = T("activate")
+    genTitle.Text = T("genTitle")
+    GenBtn.Text = T("generate")
+    CopyBtn.Text = T("copyKey")
+    GetScriptBtn.Text = T("getScript")
+    if MainGui and MainGui.Parent then
+        pcall(function() MainGui:Destroy() end)
+        BuildUI()
+    end
+end)
+
 task.spawn(function()
     task.wait(1.5)
     local savedKey = LoadKey()
     if not savedKey then return end
-
     KeyBox.Text = savedKey
     ActivateBtn.Text = T("autologin")
     ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-
     local valid, info = ValidateKey(savedKey)
     if valid then
         IsAuthenticated = true
@@ -1009,14 +1276,14 @@ local MainGui, MainFrame
 function BuildUI()
     if MainGui then pcall(function() MainGui:Destroy() end) end
     MainGui = Instance.new("ScreenGui")
-    MainGui.Name = "Fondi_V6"
+    MainGui.Name = "Fondi_V7"
     MainGui.ResetOnSpawn = false
     MainGui.IgnoreGuiInset = true
     MainGui.Parent = pg
 
     MainFrame = Instance.new("Frame", MainGui)
-    MainFrame.Size = UDim2.new(0, 360, 0, 560)
-    MainFrame.Position = UDim2.new(0.5, -180, 0.5, -280)
+    MainFrame.Size = UDim2.new(0, 380, 0, 600)
+    MainFrame.Position = UDim2.new(0.5, -190, 0.5, -300)
     MainFrame.BackgroundColor3 = COLORS.Card
     MainFrame.BackgroundTransparency = 0.03
     MainFrame.BorderSizePixel = 0
@@ -1046,13 +1313,12 @@ function BuildUI()
     hs.Size = UDim2.new(1, -120, 0, 18)
     hs.Position = UDim2.new(0, 20, 0, 36)
     hs.BackgroundTransparency = 1
-    hs.Text = "V6.5 • " .. (LP.DisplayName or "User")
+    hs.Text = "V7.0 • " .. (LP.DisplayName or "User")
     hs.TextColor3 = COLORS.Accent2
     hs.Font = Enum.Font.Gotham
     hs.TextSize = 11
     hs.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Lang button
     local langBtn = Instance.new("TextButton", header)
     langBtn.Size = UDim2.new(0, 40, 0, 30)
     langBtn.Position = UDim2.new(1, -80, 0, 17)
@@ -1077,7 +1343,6 @@ function BuildUI()
         BuildUI()
     end)
 
-    -- Close button
     local close = Instance.new("TextButton", header)
     close.Size = UDim2.new(0, 30, 0, 30)
     close.Position = UDim2.new(1, -36, 0, 17)
@@ -1092,8 +1357,8 @@ function BuildUI()
         Tween(MainFrame, 0.25, {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
         task.wait(0.25)
         MainFrame.Visible = false
-        MainFrame.Size = UDim2.new(0, 360, 0, 560)
-        MainFrame.Position = UDim2.new(0.5, -180, 0.5, -280)
+        MainFrame.Size = UDim2.new(0, 380, 0, 600)
+        MainFrame.Position = UDim2.new(0.5, -190, 0.5, -300)
     end)
 
     local scroll = Instance.new("ScrollingFrame", MainFrame)
@@ -1108,7 +1373,7 @@ function BuildUI()
     local layout = Instance.new("UIListLayout", scroll)
     layout.Padding = UDim.new(0, 8)
 
-    local function CreateToggle(name, setting, color)
+    local function CreateToggle(name, setting, color, callback)
         color = color or COLORS.Accent
 
         local btn = Instance.new("TextButton", scroll)
@@ -1168,32 +1433,113 @@ function BuildUI()
             PlayToggleSound()
             Notify(name .. ": " .. (on and T("on") or T("off")), on and COLORS.Success or COLORS.Danger)
 
-            if setting == "ESP" then
-                if Settings.ESP then
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p ~= LP then CreateESP(p) end
-                    end
-                else
-                    for p, _ in pairs(ESPObjects) do RemoveESP(p) end
-                end
-            end
-            if setting == "Fly" then
-                if Settings.Fly then StartFly() else StopFly() end
-            end
-            if setting == "Noclip" then
-                if Settings.Noclip then StartNoclip() else StopNoclip() end
-            end
+            if callback then callback(on) end
         end)
     end
 
-    CreateToggle(T("esp"), "ESP", COLORS.Accent)
+    -- ESP
+    CreateToggle(T("esp"), "ESP", COLORS.Accent, function(on)
+        if on then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LP then CreateESP(p) end
+            end
+        else
+            for p, _ in pairs(ESPObjects) do RemoveESP(p) end
+        end
+    end)
     CreateToggle(T("outline"), "Outline", COLORS.Accent2)
     CreateToggle(T("tracers"), "Tracers", Color3.fromRGB(255, 100, 200))
     CreateToggle(T("names"), "ShowNames", Color3.fromRGB(150, 200, 255))
     CreateToggle(T("roles"), "ShowRoles", Color3.fromRGB(200, 150, 255))
-    CreateToggle(T("fly"), "Fly", Color3.fromRGB(0, 200, 255))
-    CreateToggle(T("noclip"), "Noclip", Color3.fromRGB(100, 255, 100))
 
+    -- Movement
+    CreateToggle(T("fly"), "Fly", Color3.fromRGB(0, 200, 255), function(on)
+        if on then StartFly() else StopFly() end
+    end)
+    CreateToggle(T("noclip"), "Noclip", Color3.fromRGB(100, 255, 100), function(on)
+        if on then StartNoclip() else StopNoclip() end
+    end)
+    CreateToggle(T("bhop"), "Bhop", Color3.fromRGB(150, 200, 100), function(on)
+        if on then StartBhop() else StopBhop() end
+    end)
+    CreateToggle(T("antiFling"), "AntiFling", Color3.fromRGB(255, 150, 50), function(on)
+        if on then StartAntiFling() else StopAntiFling() end
+    end)
+
+    -- Kill Aura
+    CreateToggle(T("killAura"), "KillAura", Color3.fromRGB(255, 50, 100), function(on)
+        if on then StartKillAura() else StopKillAura() end
+    end)
+
+    -- Ползунок дистанции Kill Aura
+    local sliderFrame = Instance.new("Frame", scroll)
+    sliderFrame.Size = UDim2.new(1, -5, 0, 40)
+    sliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    sliderFrame.BorderSizePixel = 0
+    Corner(sliderFrame, 10)
+    Stroke(sliderFrame, Color3.fromRGB(45, 45, 65), 1.5)
+
+    local sliderLabel = Instance.new("TextLabel", sliderFrame)
+    sliderLabel.Size = UDim2.new(0, 100, 1, 0)
+    sliderLabel.Position = UDim2.new(0, 16, 0, 0)
+    sliderLabel.BackgroundTransparency = 1
+    sliderLabel.Text = T("killAuraRange") .. Settings.KillAuraRange
+    sliderLabel.TextColor3 = COLORS.Text
+    sliderLabel.Font = Enum.Font.GothamBold
+    sliderLabel.TextSize = 12
+    sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local sliderBar = Instance.new("Frame", sliderFrame)
+    sliderBar.Size = UDim2.new(0, 180, 0, 6)
+    sliderBar.Position = UDim2.new(1, -200, 0.5, -3)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+    sliderBar.BorderSizePixel = 0
+    Corner(sliderBar, 3)
+
+    local sliderFill = Instance.new("Frame", sliderBar)
+    sliderFill.Size = UDim2.new((Settings.KillAuraRange - 5) / 45, 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(255, 50, 100)
+    sliderFill.BorderSizePixel = 0
+    Corner(sliderFill, 3)
+
+    local sliderKnob = Instance.new("Frame", sliderBar)
+    sliderKnob.Size = UDim2.new(0, 14, 0, 14)
+    sliderKnob.Position = UDim2.new((Settings.KillAuraRange - 5) / 45, -7, 0.5, -7)
+    sliderKnob.BackgroundColor3 = Color3.new(1, 1, 1)
+    sliderKnob.BorderSizePixel = 0
+    Corner(sliderKnob, 7)
+
+    local dragging = false
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local rel = (input.Position.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X
+            rel = math.clamp(rel, 0, 1)
+            Settings.KillAuraRange = math.floor(5 + rel * 45)
+            sliderLabel.Text = T("killAuraRange") .. Settings.KillAuraRange
+            sliderFill.Size = UDim2.new(rel, 0, 1, 0)
+            sliderKnob.Position = UDim2.new(rel, -7, 0.5, -7)
+        end
+    end)
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    -- Farm
+    CreateToggle(T("farm"), "Farm", Color3.fromRGB(255, 200, 50), function(on)
+        if on then StartFarm() else StopFarm() end
+    end)
+
+    -- Notifications
+    CreateToggle(T("notifications"), "Notifications", Color3.fromRGB(100, 200, 255))
+
+    -- Spectator
     local specBtn = Instance.new("TextButton", scroll)
     specBtn.Size = UDim2.new(1, -5, 0, 46)
     specBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
@@ -1234,6 +1580,7 @@ function BuildUI()
         Tween(specBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 44)})
     end)
 
+    -- Player list
     local listTitle = Instance.new("TextLabel", scroll)
     listTitle.Size = UDim2.new(1, -5, 0, 26)
     listTitle.BackgroundTransparency = 1
@@ -1287,8 +1634,8 @@ function BuildUI()
     MainFrame.Size = UDim2.new(0, 0, 0, 0)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     Tween(MainFrame, 0.4, {
-        Size = UDim2.new(0, 360, 0, 560),
-        Position = UDim2.new(0.5, -180, 0.5, -280)
+        Size = UDim2.new(0, 380, 0, 600),
+        Position = UDim2.new(0.5, -190, 0.5, -300)
     }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 end
 
@@ -1302,8 +1649,8 @@ local function ToggleMenu()
         MainFrame.Size = UDim2.new(0, 0, 0, 0)
         MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
         Tween(MainFrame, 0.3, {
-            Size = UDim2.new(0, 360, 0, 560),
-            Position = UDim2.new(0.5, -180, 0.5, -280)
+            Size = UDim2.new(0, 380, 0, 600),
+            Position = UDim2.new(0.5, -190, 0.5, -300)
         }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     else
         Tween(MainFrame, 0.25, {
@@ -1312,37 +1659,45 @@ local function ToggleMenu()
         }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
         task.wait(0.25)
         MainFrame.Visible = false
-        MainFrame.Size = UDim2.new(0, 360, 0, 560)
-        MainFrame.Position = UDim2.new(0.5, -180, 0.5, -280)
+        MainFrame.Size = UDim2.new(0, 380, 0, 600)
+        MainFrame.Position = UDim2.new(0.5, -190, 0.5, -300)
     end
 end
 
 UIS.InputBegan:Connect(function(input, gp)
     if gp then return end
+    if not IsAuthenticated then return end
     if input.KeyCode == Enum.KeyCode.L then
         ToggleMenu()
     elseif input.KeyCode == Enum.KeyCode.F then
-        if IsAuthenticated then
-            Settings.Fly = not Settings.Fly
-            if Settings.Fly then StartFly() else StopFly() end
-            Notify(Settings.Fly and T("flightOn") or T("flightOff"), Settings.Fly and COLORS.Success or COLORS.Danger)
-        end
+        Settings.Fly = not Settings.Fly
+        if Settings.Fly then StartFly() else StopFly() end
+        Notify(Settings.Fly and T("flightOn") or T("flightOff"), Settings.Fly and COLORS.Success or COLORS.Danger)
     elseif input.KeyCode == Enum.KeyCode.N then
-        if IsAuthenticated then
-            Settings.Noclip = not Settings.Noclip
-            if Settings.Noclip then StartNoclip() else StopNoclip() end
-            Notify(Settings.Noclip and T("noclipOn") or T("noclipOff"), Settings.Noclip and COLORS.Success or COLORS.Danger)
-        end
+        Settings.Noclip = not Settings.Noclip
+        if Settings.Noclip then StartNoclip() else StopNoclip() end
+        Notify(Settings.Noclip and T("noclipOn") or T("noclipOff"), Settings.Noclip and COLORS.Success or COLORS.Danger)
+    elseif input.KeyCode == Enum.KeyCode.B then
+        Settings.Bhop = not Settings.Bhop
+        if Settings.Bhop then StartBhop() else StopBhop() end
+        Notify(Settings.Bhop and T("bhopOn") or T("bhopOff"), Settings.Bhop and COLORS.Success or COLORS.Danger)
+    elseif input.KeyCode == Enum.KeyCode.K then
+        Settings.KillAura = not Settings.KillAura
+        if Settings.KillAura then StartKillAura() else StopKillAura() end
+        Notify(Settings.KillAura and T("killAuraOn") or T("killAuraOff"), Settings.KillAura and COLORS.Success or COLORS.Danger)
+    elseif input.KeyCode == Enum.KeyCode.G then
+        Settings.Farm = not Settings.Farm
+        if Settings.Farm then StartFarm() else StopFarm() end
+        Notify(Settings.Farm and T("farmOn") or T("farmOff"), Settings.Farm and COLORS.Success or COLORS.Danger)
     end
 end)
 
--- Загрузка сохранённого языка
 do
     local saved = LoadLang()
     if saved then Lang = saved end
 end
 
 print("==========================================")
-print("[FONDI MM2 V6.5] RU/EN READY")
+print("[FONDI MM2 V7.0] EXTENDED READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
