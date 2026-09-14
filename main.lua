@@ -1,7 +1,7 @@
 --[[
-    FONDI MM2 V6.2 // STEALTH + GET SCRIPT
-    - Fly через CFrame (без BodyVelocity)
-    - Noclip через Humanoid State
+    FONDI MM2 V6.3 // FLY & NOCLIP FIXED
+    - Fly через CFrame + Velocity lock (не падает)
+    - Noclip через CanCollide каждый кадр
     - Online key auth через Vercel API
     - Кнопка "Получить скрипт" (копирует ссылку сайта)
     - ESP / Outline / Tracers / Names / Roles
@@ -416,7 +416,7 @@ task.spawn(function()
 end)
 
 --==================================================
--- NOCLIP (STEALTH)
+-- NOCLIP (CanCollide every frame)
 --==================================================
 local noclipConnection = nil
 
@@ -427,9 +427,10 @@ local function StopNoclip()
     end
     local c = LP.Character
     if c then
-        local h = c:FindFirstChildOfClass("Humanoid")
-        if h then
-            pcall(function() h:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+        for _, o in ipairs(c:GetDescendants()) do
+            if o:IsA("BasePart") then
+                pcall(function() o.CanCollide = true end)
+            end
         end
     end
 end
@@ -440,16 +441,18 @@ local function StartNoclip()
         if not IsAuthenticated or not Settings.Noclip then return end
         local c = LP.Character
         if not c then return end
-        local h = c:FindFirstChildOfClass("Humanoid")
-        if not h then return end
-        pcall(function()
-            h:ChangeState(Enum.HumanoidStateType.StrafingNoPhysics)
-        end)
+        for _, o in ipairs(c:GetDescendants()) do
+            if o:IsA("BasePart") then
+                if o.CanCollide then
+                    o.CanCollide = false
+                end
+            end
+        end
     end)
 end
 
 --==================================================
--- FLY (STEALTH — CFrame based)
+-- FLY (CFrame + Velocity lock — не падает)
 --==================================================
 local flyConnection = nil
 local flyActive = false
@@ -481,6 +484,13 @@ local function StartFly()
         local h = c:FindFirstChildOfClass("Humanoid")
         if not r or not h then return end
 
+        -- Отключаем физику падения и гравитацию
+        h.PlatformStand = true
+
+        -- Обнуляем скорость каждый кадр — гравитация не тянет вниз
+        r.Velocity = Vector3.zero
+        r.RotVelocity = Vector3.zero
+
         local cam = workspace.CurrentCamera
         if not cam then return end
 
@@ -496,7 +506,6 @@ local function StartFly()
             local speed = Settings.FlySpeed
             local delta = move.Unit * speed * dt
             r.CFrame = r.CFrame + delta
-            r.Velocity = Vector3.zero
         end
     end)
 end
@@ -547,7 +556,7 @@ local keySub = Instance.new("TextLabel", KeyFrame)
 keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 72)
 keySub.BackgroundTransparency = 1
-keySub.Text = "V6.2 • STEALTH EDITION"
+keySub.Text = "V6.3 • FLY & NOCLIP FIXED"
 keySub.TextColor3 = COLORS.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -829,7 +838,7 @@ function BuildUI()
     hs.Size = UDim2.new(1, -60, 0, 18)
     hs.Position = UDim2.new(0, 20, 0, 36)
     hs.BackgroundTransparency = 1
-    hs.Text = "V6.2 • " .. (LP.DisplayName or "User")
+    hs.Text = "V6.3 • " .. (LP.DisplayName or "User")
     hs.TextColor3 = COLORS.Accent2
     hs.Font = Enum.Font.Gotham
     hs.TextSize = 11
@@ -1094,6 +1103,6 @@ UIS.InputBegan:Connect(function(input, gp)
 end)
 
 print("==========================================")
-print("[FONDI MM2 V6.2] READY")
+print("[FONDI MM2 V6.3] READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
