@@ -1,9 +1,10 @@
 --[[
-    FONDI MM2 V6.4 // AUTO-SESSION
-    - Fly через CFrame + Velocity lock (не падает)
-    - Noclip через CanCollide каждый кадр
-    - Автосохранение ключа (writefile/readfile)
-    - Online key auth через Vercel API
+    FONDI MM2 V6.5 // RU/EN
+    - Переключение языка RU/EN кнопкой
+    - Fly через CFrame + Velocity lock
+    - Noclip через CanCollide
+    - Автосохранение ключа
+    - Online key auth
     - ESP / Outline / Tracers / Names / Roles
     - Hotkeys: [L] menu, [F] Fly, [N] Noclip
 ]]
@@ -28,6 +29,7 @@ local AUTH_URL = "https://fondi-mm-2-auntification.vercel.app/api/validate"
 local GENERATE_URL = "https://fondi-mm-2-auntification.vercel.app/api/generate"
 local SITE_URL = "https://fondi-mm-2-auntification.vercel.app/"
 local KEY_FILE = "fondi_key.txt"
+local LANG_FILE = "fondi_lang.txt"
 
 --==================================================
 -- SETTINGS
@@ -40,6 +42,7 @@ local Settings = {
 }
 
 local IsAuthenticated = false
+local Lang = "ru"
 
 --==================================================
 -- COLORS
@@ -58,6 +61,92 @@ local COLORS = {
     Danger   = Color3.fromRGB(239, 68, 68),
     Warning  = Color3.fromRGB(245, 158, 11)
 }
+
+--==================================================
+-- I18N
+--==================================================
+local I18N = {
+    ru = {
+        esp = "ESP", outline = "OUTLINE", tracers = "TRACERS",
+        names = "NAMES", roles = "ROLES",
+        fly = "FLY [F]", noclip = "NOCLIP [N]",
+        spectator = "SPECTATOR",
+        playerList = "PLAYER LIST",
+        menuTitle = "FONDI MM2",
+        on = "ВКЛ", off = "ВЫКЛ",
+        keyInput = "ВВЕДИТЕ КЛЮЧ",
+        keyInvalid = "НЕВЕРНЫЙ КЛЮЧ",
+        keyExpired = "СЕССИЯ ИСТЕКЛА",
+        activate = "АКТИВИРОВАТЬ",
+        checking = "ПРОВЕРКА...",
+        autologin = "АВТОВХОД...",
+        genTitle = "СГЕНЕРИРОВАТЬ НОВЫЙ КЛЮЧ",
+        generate = "СГЕНЕРИРОВАТЬ",
+        generating = "ГЕНЕРАЦИЯ...",
+        done = "✓ ГОТОВО",
+        copyKey = "СКОПИРОВАТЬ КЛЮЧ",
+        copied = "✓ СКОПИРОВАНО",
+        getScript = "ПОЛУЧИТЬ СКРИПТ",
+        linkCopied = "✓ ССЫЛКА СКОПИРОВАНА",
+        accessGranted = "ДОСТУП РАЗРЕШЁН",
+        autologinOk = "АВТОВХОД: ДОСТУП РАЗРЕШЁН",
+        sessionExpired = "Сессия истекла, введите ключ",
+        keyCreated = "КЛЮЧ СОЗДАН",
+        keyCopiedMsg = "Ключ скопирован!",
+        linkCopiedMsg = "Ссылка скопирована!",
+        noKey = "Нет ключа",
+        errorMsg = "Ошибка",
+        noPlayers = "Нет игроков",
+        invalidKey = "Неверный ключ",
+        flightOn = "FLY: ВКЛ", flightOff = "FLY: ВЫКЛ",
+        noclipOn = "NOCLIP: ВКЛ", noclipOff = "NOCLIP: ВЫКЛ",
+        langBtn = "EN",
+        clipUnavailable = "setclipboard недоступен",
+        autologinText = "АВТОВХОД..."
+    },
+    en = {
+        esp = "ESP", outline = "OUTLINE", tracers = "TRACERS",
+        names = "NAMES", roles = "ROLES",
+        fly = "FLY [F]", noclip = "NOCLIP [N]",
+        spectator = "SPECTATOR",
+        playerList = "PLAYER LIST",
+        menuTitle = "FONDI MM2",
+        on = "ON", off = "OFF",
+        keyInput = "ENTER KEY",
+        keyInvalid = "INVALID KEY",
+        keyExpired = "SESSION EXPIRED",
+        activate = "ACTIVATE",
+        checking = "CHECKING...",
+        autologin = "AUTO-LOGIN...",
+        genTitle = "GENERATE NEW KEY",
+        generate = "GENERATE",
+        generating = "GENERATING...",
+        done = "✓ DONE",
+        copyKey = "COPY KEY",
+        copied = "✓ COPIED",
+        getScript = "GET SCRIPT",
+        linkCopied = "✓ LINK COPIED",
+        accessGranted = "ACCESS GRANTED",
+        autologinOk = "AUTO-LOGIN: ACCESS GRANTED",
+        sessionExpired = "Session expired, enter key",
+        keyCreated = "KEY CREATED",
+        keyCopiedMsg = "Key copied!",
+        linkCopiedMsg = "Link copied!",
+        noKey = "No key",
+        errorMsg = "Error",
+        noPlayers = "No players",
+        invalidKey = "Invalid key",
+        flightOn = "FLY: ON", flightOff = "FLY: OFF",
+        noclipOn = "NOCLIP: ON", noclipOff = "NOCLIP: OFF",
+        langBtn = "RU",
+        clipUnavailable = "setclipboard unavailable",
+        autologinText = "AUTO-LOGIN..."
+    }
+}
+
+local function T(key)
+    return (I18N[Lang] and I18N[Lang][key]) or key
+end
 
 --==================================================
 -- HELPERS
@@ -118,14 +207,23 @@ local function GetHWID()
 end
 
 local function ValidateKey(key)
-    local data, err = HttpPost(AUTH_URL, {key = key, userId = tostring(LP.UserId), hwid = GetHWID()})
+    local data, err = HttpPost(AUTH_URL, {
+        key = key,
+        userId = tostring(LP.UserId),
+        hwid = GetHWID(),
+        lang = Lang
+    })
     if not data then return false, err end
     if data.valid then return true, data end
-    return false, data.reason or "Неверный ключ"
+    return false, data.reason or T("invalidKey")
 end
 
 local function GenerateKeyRemote(duration)
-    local data, err = HttpPost(GENERATE_URL, {duration = duration, userId = tostring(LP.UserId)})
+    local data, err = HttpPost(GENERATE_URL, {
+        duration = duration,
+        userId = tostring(LP.UserId),
+        lang = Lang
+    })
     if not data then return nil, err end
     if data.error then return nil, data.error end
     return data.key, data
@@ -136,31 +234,38 @@ end
 --==================================================
 local function SaveKey(key)
     pcall(function()
-        if writefile then
-            writefile(KEY_FILE, key)
-        end
+        if writefile then writefile(KEY_FILE, key) end
     end)
 end
 
 local function LoadKey()
     local ok, content = pcall(function()
-        if readfile and isfile and isfile(KEY_FILE) then
-            return readfile(KEY_FILE)
-        end
+        if readfile and isfile and isfile(KEY_FILE) then return readfile(KEY_FILE) end
         return nil
     end)
-    if ok and content and content ~= "" then
-        return content
-    end
+    if ok and content and content ~= "" then return content end
     return nil
 end
 
 local function ClearKey()
     pcall(function()
-        if delfile and isfile and isfile(KEY_FILE) then
-            delfile(KEY_FILE)
-        end
+        if delfile and isfile and isfile(KEY_FILE) then delfile(KEY_FILE) end
     end)
+end
+
+local function SaveLang(l)
+    pcall(function()
+        if writefile then writefile(LANG_FILE, l) end
+    end)
+end
+
+local function LoadLang()
+    local ok, content = pcall(function()
+        if readfile and isfile and isfile(LANG_FILE) then return readfile(LANG_FILE) end
+        return nil
+    end)
+    if ok and content and (content == "ru" or content == "en") then return content end
+    return nil
 end
 
 --==================================================
@@ -573,11 +678,28 @@ KeyFrame.Active = true
 Corner(KeyFrame, 18)
 Stroke(KeyFrame, COLORS.Accent, 1.5)
 
+-- Кнопка языка в окне ключа
+local keyLangBtn = Instance.new("TextButton", KeyFrame)
+keyLangBtn.Size = UDim2.new(0, 50, 0, 26)
+keyLangBtn.Position = UDim2.new(1, -62, 0, 10)
+keyLangBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
+keyLangBtn.Text = T("langBtn")
+keyLangBtn.TextColor3 = COLORS.Accent2
+keyLangBtn.Font = Enum.Font.GothamBold
+keyLangBtn.TextSize = 12
+keyLangBtn.BorderSizePixel = 0
+keyLangBtn.AutoButtonColor = false
+Corner(keyLangBtn, 8)
+Stroke(keyLangBtn, COLORS.Accent2, 1)
+
+keyLangBtn.MouseEnter:Connect(function() Tween(keyLangBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
+keyLangBtn.MouseLeave:Connect(function() Tween(keyLangBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)}) end)
+
 local keyHeader = Instance.new("TextLabel", KeyFrame)
 keyHeader.Size = UDim2.new(1, 0, 0, 42)
 keyHeader.Position = UDim2.new(0, 0, 0, 30)
 keyHeader.BackgroundTransparency = 1
-keyHeader.Text = "FONDI MM2"
+keyHeader.Text = T("menuTitle")
 keyHeader.TextColor3 = COLORS.Text
 keyHeader.Font = Enum.Font.GothamBold
 keyHeader.TextSize = 26
@@ -586,7 +708,7 @@ local keySub = Instance.new("TextLabel", KeyFrame)
 keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 72)
 keySub.BackgroundTransparency = 1
-keySub.Text = "V6.4 • AUTO-SESSION"
+keySub.Text = "V6.5 • RU/EN"
 keySub.TextColor3 = COLORS.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -594,7 +716,7 @@ keySub.TextSize = 11
 local KeyBox = Instance.new("TextBox", KeyFrame)
 KeyBox.Size = UDim2.new(0.85, 0, 0, 46)
 KeyBox.Position = UDim2.new(0.075, 0, 0, 115)
-KeyBox.PlaceholderText = "ВВЕДИТЕ КЛЮЧ"
+KeyBox.PlaceholderText = T("keyInput")
 KeyBox.Text = ""
 KeyBox.ClearTextOnFocus = false
 KeyBox.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
@@ -609,7 +731,7 @@ Stroke(KeyBox, Color3.fromRGB(45, 45, 65), 1)
 local ActivateBtn = Instance.new("TextButton", KeyFrame)
 ActivateBtn.Size = UDim2.new(0.85, 0, 0, 46)
 ActivateBtn.Position = UDim2.new(0.075, 0, 0, 172)
-ActivateBtn.Text = "АКТИВИРОВАТЬ"
+ActivateBtn.Text = T("activate")
 ActivateBtn.BackgroundColor3 = COLORS.Accent
 ActivateBtn.TextColor3 = COLORS.Text
 ActivateBtn.Font = Enum.Font.GothamBold
@@ -628,7 +750,7 @@ local genTitle = Instance.new("TextLabel", KeyFrame)
 genTitle.Size = UDim2.new(1, 0, 0, 20)
 genTitle.Position = UDim2.new(0, 0, 0, 255)
 genTitle.BackgroundTransparency = 1
-genTitle.Text = "СГЕНЕРИРОВАТЬ НОВЫЙ КЛЮЧ"
+genTitle.Text = T("genTitle")
 genTitle.TextColor3 = COLORS.SubText
 genTitle.Font = Enum.Font.GothamBold
 genTitle.TextSize = 11
@@ -687,7 +809,7 @@ durButtons[1].stroke.Color = COLORS.Accent2
 local GenBtn = Instance.new("TextButton", KeyFrame)
 GenBtn.Size = UDim2.new(0.85, 0, 0, 42)
 GenBtn.Position = UDim2.new(0.075, 0, 0, 335)
-GenBtn.Text = "СГЕНЕРИРОВАТЬ"
+GenBtn.Text = T("generate")
 GenBtn.BackgroundColor3 = COLORS.Success
 GenBtn.TextColor3 = COLORS.Text
 GenBtn.Font = Enum.Font.GothamBold
@@ -699,7 +821,7 @@ Corner(GenBtn, 10)
 local CopyBtn = Instance.new("TextButton", KeyFrame)
 CopyBtn.Size = UDim2.new(0.85, 0, 0, 42)
 CopyBtn.Position = UDim2.new(0.075, 0, 0, 388)
-CopyBtn.Text = "СКОПИРОВАТЬ КЛЮЧ"
+CopyBtn.Text = T("copyKey")
 CopyBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
 CopyBtn.TextColor3 = COLORS.Accent2
 CopyBtn.Font = Enum.Font.GothamBold
@@ -712,7 +834,7 @@ Stroke(CopyBtn, COLORS.Accent2, 1)
 local GetScriptBtn = Instance.new("TextButton", KeyFrame)
 GetScriptBtn.Size = UDim2.new(0.85, 0, 0, 42)
 GetScriptBtn.Position = UDim2.new(0.075, 0, 0, 441)
-GetScriptBtn.Text = "ПОЛУЧИТЬ СКРИПТ"
+GetScriptBtn.Text = T("getScript")
 GetScriptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
 GetScriptBtn.TextColor3 = COLORS.Accent2
 GetScriptBtn.Font = Enum.Font.GothamBold
@@ -733,6 +855,29 @@ GetScriptBtn.MouseLeave:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundC
 
 KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
 Tween(KeyFrame, 0.5, {Position = UDim2.new(0.5, -200, 0.5, -265)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+-- Смена языка в окне ключа
+keyLangBtn.MouseButton1Click:Connect(function()
+    Lang = (Lang == "ru") and "en" or "ru"
+    SaveLang(Lang)
+    PlayToggleSound()
+
+    -- Обновляем тексты
+    keyLangBtn.Text = T("langBtn")
+    keyHeader.Text = T("menuTitle")
+    KeyBox.PlaceholderText = T("keyInput")
+    ActivateBtn.Text = T("activate")
+    genTitle.Text = T("genTitle")
+    GenBtn.Text = T("generate")
+    CopyBtn.Text = T("copyKey")
+    GetScriptBtn.Text = T("getScript")
+
+    -- Пересобираем главное меню
+    if MainGui and MainGui.Parent then
+        pcall(function() MainGui:Destroy() end)
+        BuildUI()
+    end
+end)
 
 local function CloseKeyGui()
     Tween(KeyFrame, 0.3, {
@@ -755,22 +900,22 @@ end
 
 -- AUTH
 ActivateBtn.MouseButton1Click:Connect(function()
-    if KeyBox.Text == "" then Notify("Введите ключ", COLORS.Warning); return end
-    ActivateBtn.Text = "ПРОВЕРКА..."
+    if KeyBox.Text == "" then Notify(T("keyInput"), COLORS.Warning); return end
+    ActivateBtn.Text = T("checking")
     ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
 
     local valid, info = ValidateKey(KeyBox.Text)
     if valid then
         IsAuthenticated = true
         SaveKey(KeyBox.Text)
-        Notify("ДОСТУП РАЗРЕШЁН", COLORS.Success)
+        Notify(T("accessGranted"), COLORS.Success)
         CloseKeyGui()
     else
         KeyBox.Text = ""
-        KeyBox.PlaceholderText = "НЕВЕРНЫЙ КЛЮЧ"
-        ActivateBtn.Text = "АКТИВИРОВАТЬ"
+        KeyBox.PlaceholderText = T("keyInvalid")
+        ActivateBtn.Text = T("activate")
         ActivateBtn.BackgroundColor3 = COLORS.Accent
-        Notify(info or "Неверный ключ", COLORS.Danger)
+        Notify(info or T("invalidKey"), COLORS.Danger)
         local orig = KeyBox.Position
         for i = 1, 4 do
             Tween(KeyBox, 0.05, {Position = orig + UDim2.new(0, (i%2==0 and 6 or -6), 0, 0)})
@@ -782,7 +927,7 @@ end)
 
 -- GENERATE
 GenBtn.MouseButton1Click:Connect(function()
-    GenBtn.Text = "ГЕНЕРАЦИЯ..."
+    GenBtn.Text = T("generating")
     GenBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
     GenBtn.Active = false
 
@@ -790,12 +935,12 @@ GenBtn.MouseButton1Click:Connect(function()
         local key, info = GenerateKeyRemote(selectedDuration)
         if key then
             KeyBox.Text = key
-            Notify("КЛЮЧ СОЗДАН", COLORS.Success)
-            GenBtn.Text = "✓ ГОТОВО"
+            Notify(T("keyCreated"), COLORS.Success)
+            GenBtn.Text = T("done")
             GenBtn.BackgroundColor3 = COLORS.Success
         else
-            Notify(info or "Ошибка", COLORS.Danger)
-            GenBtn.Text = "СГЕНЕРИРОВАТЬ"
+            Notify(info or T("errorMsg"), COLORS.Danger)
+            GenBtn.Text = T("generate")
             GenBtn.BackgroundColor3 = COLORS.Success
             GenBtn.Active = true
         end
@@ -804,15 +949,15 @@ end)
 
 -- COPY KEY
 CopyBtn.MouseButton1Click:Connect(function()
-    if KeyBox.Text == "" then Notify("Нет ключа", COLORS.Warning); return end
+    if KeyBox.Text == "" then Notify(T("noKey"), COLORS.Warning); return end
     if setclipboard then
         setclipboard(KeyBox.Text)
-        Notify("Ключ скопирован!", COLORS.Success)
-        CopyBtn.Text = "✓ СКОПИРОВАНО"
+        Notify(T("keyCopiedMsg"), COLORS.Success)
+        CopyBtn.Text = T("copied")
         task.wait(1.2)
-        CopyBtn.Text = "СКОПИРОВАТЬ КЛЮЧ"
+        CopyBtn.Text = T("copyKey")
     else
-        Notify("setclipboard недоступен", COLORS.Danger)
+        Notify(T("clipUnavailable"), COLORS.Danger)
     end
 end)
 
@@ -820,14 +965,14 @@ end)
 GetScriptBtn.MouseButton1Click:Connect(function()
     if setclipboard then
         setclipboard(SITE_URL)
-        Notify("Ссылка скопирована!", COLORS.Success)
-        GetScriptBtn.Text = "✓ ССЫЛКА СКОПИРОВАНА"
+        Notify(T("linkCopiedMsg"), COLORS.Success)
+        GetScriptBtn.Text = T("linkCopied")
         Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(16, 60, 40)})
         task.wait(1.8)
-        GetScriptBtn.Text = "ПОЛУЧИТЬ СКРИПТ"
+        GetScriptBtn.Text = T("getScript")
         Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)})
     else
-        Notify("setclipboard недоступен", COLORS.Danger)
+        Notify(T("clipUnavailable"), COLORS.Danger)
     end
 end)
 
@@ -838,21 +983,21 @@ task.spawn(function()
     if not savedKey then return end
 
     KeyBox.Text = savedKey
-    ActivateBtn.Text = "АВТОВХОД..."
+    ActivateBtn.Text = T("autologin")
     ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
 
     local valid, info = ValidateKey(savedKey)
     if valid then
         IsAuthenticated = true
-        Notify("АВТОВХОД: ДОСТУП РАЗРЕШЁН", COLORS.Success)
+        Notify(T("autologinOk"), COLORS.Success)
         CloseKeyGui()
     else
         ClearKey()
         KeyBox.Text = ""
-        KeyBox.PlaceholderText = "СЕССИЯ ИСТЕКЛА"
-        ActivateBtn.Text = "АКТИВИРОВАТЬ"
+        KeyBox.PlaceholderText = T("keyExpired")
+        ActivateBtn.Text = T("activate")
         ActivateBtn.BackgroundColor3 = COLORS.Accent
-        Notify("Сессия истекла, введите ключ", COLORS.Warning)
+        Notify(T("sessionExpired"), COLORS.Warning)
     end
 end)
 
@@ -888,28 +1033,54 @@ function BuildUI()
     Corner(header, 18)
 
     local ht = Instance.new("TextLabel", header)
-    ht.Size = UDim2.new(1, -60, 0, 30)
+    ht.Size = UDim2.new(1, -120, 0, 30)
     ht.Position = UDim2.new(0, 20, 0, 8)
     ht.BackgroundTransparency = 1
-    ht.Text = "FONDI MM2"
+    ht.Text = T("menuTitle")
     ht.TextColor3 = COLORS.Text
     ht.Font = Enum.Font.GothamBold
     ht.TextSize = 20
     ht.TextXAlignment = Enum.TextXAlignment.Left
 
     local hs = Instance.new("TextLabel", header)
-    hs.Size = UDim2.new(1, -60, 0, 18)
+    hs.Size = UDim2.new(1, -120, 0, 18)
     hs.Position = UDim2.new(0, 20, 0, 36)
     hs.BackgroundTransparency = 1
-    hs.Text = "V6.4 • " .. (LP.DisplayName or "User")
+    hs.Text = "V6.5 • " .. (LP.DisplayName or "User")
     hs.TextColor3 = COLORS.Accent2
     hs.Font = Enum.Font.Gotham
     hs.TextSize = 11
     hs.TextXAlignment = Enum.TextXAlignment.Left
 
+    -- Lang button
+    local langBtn = Instance.new("TextButton", header)
+    langBtn.Size = UDim2.new(0, 40, 0, 30)
+    langBtn.Position = UDim2.new(1, -80, 0, 17)
+    langBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
+    langBtn.Text = T("langBtn")
+    langBtn.TextColor3 = COLORS.Accent2
+    langBtn.Font = Enum.Font.GothamBold
+    langBtn.TextSize = 12
+    langBtn.BorderSizePixel = 0
+    langBtn.AutoButtonColor = false
+    Corner(langBtn, 8)
+    Stroke(langBtn, COLORS.Accent2, 1)
+
+    langBtn.MouseEnter:Connect(function() Tween(langBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
+    langBtn.MouseLeave:Connect(function() Tween(langBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)}) end)
+
+    langBtn.MouseButton1Click:Connect(function()
+        Lang = (Lang == "ru") and "en" or "ru"
+        SaveLang(Lang)
+        PlayToggleSound()
+        if MainGui then pcall(function() MainGui:Destroy() end) end
+        BuildUI()
+    end)
+
+    -- Close button
     local close = Instance.new("TextButton", header)
     close.Size = UDim2.new(0, 30, 0, 30)
-    close.Position = UDim2.new(1, -42, 0, 17)
+    close.Position = UDim2.new(1, -36, 0, 17)
     close.BackgroundColor3 = Color3.fromRGB(45, 20, 25)
     close.Text = "✕"
     close.TextColor3 = COLORS.Danger
@@ -995,7 +1166,7 @@ function BuildUI()
             }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
             PlayToggleSound()
-            Notify(name .. ": " .. (on and "ВКЛ" or "ВЫКЛ"), on and COLORS.Success or COLORS.Danger)
+            Notify(name .. ": " .. (on and T("on") or T("off")), on and COLORS.Success or COLORS.Danger)
 
             if setting == "ESP" then
                 if Settings.ESP then
@@ -1015,18 +1186,18 @@ function BuildUI()
         end)
     end
 
-    CreateToggle("ESP", "ESP", COLORS.Accent)
-    CreateToggle("OUTLINE", "Outline", COLORS.Accent2)
-    CreateToggle("TRACERS", "Tracers", Color3.fromRGB(255, 100, 200))
-    CreateToggle("NAMES", "ShowNames", Color3.fromRGB(150, 200, 255))
-    CreateToggle("ROLES", "ShowRoles", Color3.fromRGB(200, 150, 255))
-    CreateToggle("FLY [F]", "Fly", Color3.fromRGB(0, 200, 255))
-    CreateToggle("NOCLIP [N]", "Noclip", Color3.fromRGB(100, 255, 100))
+    CreateToggle(T("esp"), "ESP", COLORS.Accent)
+    CreateToggle(T("outline"), "Outline", COLORS.Accent2)
+    CreateToggle(T("tracers"), "Tracers", Color3.fromRGB(255, 100, 200))
+    CreateToggle(T("names"), "ShowNames", Color3.fromRGB(150, 200, 255))
+    CreateToggle(T("roles"), "ShowRoles", Color3.fromRGB(200, 150, 255))
+    CreateToggle(T("fly"), "Fly", Color3.fromRGB(0, 200, 255))
+    CreateToggle(T("noclip"), "Noclip", Color3.fromRGB(100, 255, 100))
 
     local specBtn = Instance.new("TextButton", scroll)
     specBtn.Size = UDim2.new(1, -5, 0, 46)
     specBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    specBtn.Text = "SPECTATOR"
+    specBtn.Text = T("spectator")
     specBtn.TextColor3 = COLORS.Text
     specBtn.Font = Enum.Font.GothamBold
     specBtn.TextSize = 13
@@ -1040,7 +1211,7 @@ function BuildUI()
         local cam = workspace.CurrentCamera
         if not Settings.Spectator then
             cam.CameraSubject = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
-            specBtn.Text = "SPECTATOR"
+            specBtn.Text = T("spectator")
             specBtn.TextColor3 = COLORS.Text
             Tween(specBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(20, 20, 30)})
             return
@@ -1053,12 +1224,12 @@ function BuildUI()
         end
         if #list == 0 then
             Settings.Spectator = false
-            Notify("Нет игроков", COLORS.Danger)
+            Notify(T("noPlayers"), COLORS.Danger)
             return
         end
         local t = list[1]
         cam.CameraSubject = t.Character:FindFirstChildOfClass("Humanoid")
-        specBtn.Text = "SPECTATOR: " .. t.DisplayName
+        specBtn.Text = T("spectator") .. ": " .. t.DisplayName
         specBtn.TextColor3 = COLORS.Accent2
         Tween(specBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 44)})
     end)
@@ -1066,7 +1237,7 @@ function BuildUI()
     local listTitle = Instance.new("TextLabel", scroll)
     listTitle.Size = UDim2.new(1, -5, 0, 26)
     listTitle.BackgroundTransparency = 1
-    listTitle.Text = "PLAYER LIST"
+    listTitle.Text = T("playerList")
     listTitle.TextColor3 = COLORS.SubText
     listTitle.Font = Enum.Font.GothamBold
     listTitle.TextSize = 11
@@ -1154,18 +1325,24 @@ UIS.InputBegan:Connect(function(input, gp)
         if IsAuthenticated then
             Settings.Fly = not Settings.Fly
             if Settings.Fly then StartFly() else StopFly() end
-            Notify("FLY: " .. (Settings.Fly and "ВКЛ" or "ВЫКЛ"), Settings.Fly and COLORS.Success or COLORS.Danger)
+            Notify(Settings.Fly and T("flightOn") or T("flightOff"), Settings.Fly and COLORS.Success or COLORS.Danger)
         end
     elseif input.KeyCode == Enum.KeyCode.N then
         if IsAuthenticated then
             Settings.Noclip = not Settings.Noclip
             if Settings.Noclip then StartNoclip() else StopNoclip() end
-            Notify("NOCLIP: " .. (Settings.Noclip and "ВКЛ" or "ВЫКЛ"), Settings.Noclip and COLORS.Success or COLORS.Danger)
+            Notify(Settings.Noclip and T("noclipOn") or T("noclipOff"), Settings.Noclip and COLORS.Success or COLORS.Danger)
         end
     end
 end)
 
+-- Загрузка сохранённого языка
+do
+    local saved = LoadLang()
+    if saved then Lang = saved end
+end
+
 print("==========================================")
-print("[FONDI MM2 V6.4] READY")
+print("[FONDI MM2 V6.5] RU/EN READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
