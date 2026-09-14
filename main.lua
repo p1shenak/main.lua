@@ -1,14 +1,15 @@
 --[[
-    FONDI MM2 V7.0 // EXTENDED
-    - Kill Aura / Auto-Stab (с ползунком дистанции)
-    - Coin/Gem Farm (авто-подлёт с Fly+Noclip)
-    - Bhop (auto-bhop)
-    - Anti-Fling (защита от флинга)
-    - Kill/Sheriff Notification
-    - Fly / Noclip / ESP / Outline / Tracers
-    - RU/EN переключение
-    - Автосохранение сессии
-    - Hotkeys: [L] menu, [F] Fly, [N] Noclip, [B] Bhop, [K] KillAura, [G] Farm
+    FONDI MM2 V8.0 // ORION UI EDITION
+    - Aimbot для Sheriff (видимый, по RMB)
+    - Reveal Murderer (уведомление + чат)
+    - Auto-Pickup оружия
+    - Kill All (только с ножом)
+    - Fling (выброс за карту)
+    - Anti-Kick уведомление
+    - Fly / Noclip / Bhop / Anti-Fling / Kill Aura / Farm
+    - ESP / Outline / Tracers / Names / Roles
+    - RU/EN
+    - UI: Orion Library
 ]]
 
 --==================================================
@@ -17,57 +18,34 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local SoundService = game:GetService("SoundService")
 local HttpService = game:GetService("HttpService")
+local SoundService = game:GetService("SoundService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
 
 local LP = Players.LocalPlayer
 local pg = LP:WaitForChild("PlayerGui")
+
+--==================================================
+-- ORION UI
+--==================================================
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Qanuir/orion-ui/refs/heads/main/source.lua"))()
 
 --==================================================
 -- CONFIG
 --==================================================
 local AUTH_URL = "https://fondi-mm-2-auntification.vercel.app/api/validate"
 local GENERATE_URL = "https://fondi-mm-2-auntification.vercel.app/api/generate"
-local SITE_URL = "https://fondi-mm-2-auntification.vercel.app/"
 local KEY_FILE = "fondi_key.txt"
 local LANG_FILE = "fondi_lang.txt"
 
---==================================================
--- SETTINGS
---==================================================
-local Settings = {
-    ESP = false, Outline = true, Tracers = true,
-    ShowNames = true, ShowRoles = true,
-    Fly = false, Noclip = false, FlySpeed = 55,
-    Spectator = false,
-    Bhop = false,
-    AntiFling = false,
-    KillAura = false,
-    KillAuraRange = 12,   -- studs
-    Farm = false,          -- Coin/Gem Farm
-    Notifications = true   -- Kill/Sheriff уведомления
-}
-
 local IsAuthenticated = false
 local Lang = "ru"
-
---==================================================
--- COLORS
---==================================================
-local COLORS = {
-    Murderer = Color3.fromRGB(255, 60, 60),
-    Sheriff  = Color3.fromRGB(60, 140, 255),
-    Innocent = Color3.fromRGB(60, 255, 120),
-    Dead     = Color3.fromRGB(130, 130, 130),
-    Accent   = Color3.fromRGB(124, 58, 237),
-    Accent2  = Color3.fromRGB(6, 182, 212),
-    Card     = Color3.fromRGB(15, 15, 22),
-    Text     = Color3.fromRGB(255, 255, 255),
-    SubText  = Color3.fromRGB(150, 150, 170),
-    Success  = Color3.fromRGB(16, 185, 129),
-    Danger   = Color3.fromRGB(239, 68, 68),
-    Warning  = Color3.fromRGB(245, 158, 11)
+local Settings = {
+    ESP = false, Outline = true, Tracers = true, ShowNames = true, ShowRoles = true,
+    Fly = false, Noclip = false, Bhop = false, AntiFling = false, FlySpeed = 55,
+    Aimbot = false, RevealMurderer = false, AutoPickup = false,
+    KillAll = false, KillAuraRange = 15, Farm = false, Notifications = true
 }
 
 --==================================================
@@ -75,564 +53,283 @@ local COLORS = {
 --==================================================
 local I18N = {
     ru = {
-        esp = "ESP", outline = "OUTLINE", tracers = "TRACERS",
-        names = "NAMES", roles = "ROLES",
-        fly = "FLY [F]", noclip = "NOCLIP [N]",
-        spectator = "SPECTATOR",
-        bhop = "BHOP [B]",
-        antiFling = "ANTI-FLING",
-        killAura = "KILL AURA [K]",
-        killAuraRange = "РАДИУС: ",
-        farm = "FARM [G]",
-        notifications = "УВЕДОМЛЕНИЯ",
-        playerList = "PLAYER LIST",
-        menuTitle = "FONDI MM2",
-        on = "ВКЛ", off = "ВЫКЛ",
-        keyInput = "ВВЕДИТЕ КЛЮЧ",
-        keyInvalid = "НЕВЕРНЫЙ КЛЮЧ",
-        keyExpired = "СЕССИЯ ИСТЕКЛА",
-        activate = "АКТИВИРОВАТЬ",
-        checking = "ПРОВЕРКА...",
-        autologin = "АВТОВХОД...",
-        genTitle = "СГЕНЕРИРОВАТЬ НОВЫЙ КЛЮЧ",
-        generate = "СГЕНЕРИРОВАТЬ",
-        generating = "ГЕНЕРАЦИЯ...",
-        done = "✓ ГОТОВО",
-        copyKey = "СКОПИРОВАТЬ КЛЮЧ",
-        copied = "✓ СКОПИРОВАНО",
-        getScript = "ПОЛУЧИТЬ СКРИПТ",
-        linkCopied = "✓ ССЫЛКА СКОПИРОВАНА",
-        accessGranted = "ДОСТУП РАЗРЕШЁН",
-        autologinOk = "АВТОВХОД: ДОСТУП РАЗРЕШЁН",
-        sessionExpired = "Сессия истекла, введите ключ",
-        keyCreated = "КЛЮЧ СОЗДАН",
-        keyCopiedMsg = "Ключ скопирован!",
-        linkCopiedMsg = "Ссылка скопирована!",
-        noKey = "Нет ключа",
-        errorMsg = "Ошибка",
-        noPlayers = "Нет игроков",
-        invalidKey = "Неверный ключ",
-        flightOn = "FLY: ВКЛ", flightOff = "FLY: ВЫКЛ",
-        noclipOn = "NOCLIP: ВКЛ", noclipOff = "NOCLIP: ВЫКЛ",
-        bhopOn = "BHOP: ВКЛ", bhopOff = "BHOP: ВЫКЛ",
-        antiFlingOn = "ANTI-FLING: ВКЛ", antiFlingOff = "ANTI-FLING: ВЫКЛ",
-        killAuraOn = "KILL AURA: ВКЛ", killAuraOff = "KILL AURA: ВЫКЛ",
-        farmOn = "FARM: ВКЛ", farmOff = "FARM: ВЫКЛ",
-        langBtn = "EN",
-        clipUnavailable = "setclipboard недоступен",
-        autologinText = "АВТОВХОД...",
-        becameMurderer = " стал MURDERER",
-        becameSheriff = " стал SHERIFF",
-        wasKilled = " был убит",
-        noWeapon = "Нет оружия в руках",
-        coinFound = "Найдена монета, лечу...",
-        noCoins = "Монет нет на карте",
-        antiFlingWarn = "Anti-Fling: обнаружен флинг!"
+        menu = "FONDI MM2", esp = "ESP", outline = "Контур", tracers = "Трассеры",
+        names = "Имена", roles = "Роли", fly = "Полёт", noclip = "Noclip",
+        bhop = "Bhop", antifling = "Anti-Fling", aimbot = "Aimbot (Sheriff)",
+        reveal = "Reveal Murderer", pickup = "Auto-Pickup", killall = "Kill All",
+        range = "Радиус Kill Aura", farm = "Farm (Монеты)", notif = "Уведомления",
+        langBtn = "EN", keyInput = "Введите ключ", activate = "Активировать",
+        checking = "Проверка...", autologin = "Автовход...", accessOk = "Доступ разрешён",
+        keyInvalid = "Неверный ключ", keyExpired = "Сессия истекла",
+        genKey = "Сгенерировать ключ", gen = "Сгенерировать", genTitle = "Генерация",
+        copyKey = "Скопировать ключ", getScript = "Получить скрипт",
+        copied = "Скопировано!", linkCopied = "Ссылка скопирована!",
+        murderer = "MURDERER", sheriff = "SHERIFF", wasKilled = "был убит",
+        becameM = "стал MURDERER", becameS = "стал SHERIFF", noPlayers = "Нет игроков",
+        noWeapon = "Нет оружия", flingTarget = "Выбросить игрока",
+        flingAll = "Выбросить всех", flingRadius = "Радиус выброса",
+        on = "ВКЛ", off = "ВЫКЛ", welcome = "FONDI MM2 Загружен!"
     },
     en = {
-        esp = "ESP", outline = "OUTLINE", tracers = "TRACERS",
-        names = "NAMES", roles = "ROLES",
-        fly = "FLY [F]", noclip = "NOCLIP [N]",
-        spectator = "SPECTATOR",
-        bhop = "BHOP [B]",
-        antiFling = "ANTI-FLING",
-        killAura = "KILL AURA [K]",
-        killAuraRange = "RANGE: ",
-        farm = "FARM [G]",
-        notifications = "NOTIFICATIONS",
-        playerList = "PLAYER LIST",
-        menuTitle = "FONDI MM2",
-        on = "ON", off = "OFF",
-        keyInput = "ENTER KEY",
-        keyInvalid = "INVALID KEY",
-        keyExpired = "SESSION EXPIRED",
-        activate = "ACTIVATE",
-        checking = "CHECKING...",
-        autologin = "AUTO-LOGIN...",
-        genTitle = "GENERATE NEW KEY",
-        generate = "GENERATE",
-        generating = "GENERATING...",
-        done = "✓ DONE",
-        copyKey = "COPY KEY",
-        copied = "✓ COPIED",
-        getScript = "GET SCRIPT",
-        linkCopied = "✓ LINK COPIED",
-        accessGranted = "ACCESS GRANTED",
-        autologinOk = "AUTO-LOGIN: ACCESS GRANTED",
-        sessionExpired = "Session expired, enter key",
-        keyCreated = "KEY CREATED",
-        keyCopiedMsg = "Key copied!",
-        linkCopiedMsg = "Link copied!",
-        noKey = "No key",
-        errorMsg = "Error",
-        noPlayers = "No players",
-        invalidKey = "Invalid key",
-        flightOn = "FLY: ON", flightOff = "FLY: OFF",
-        noclipOn = "NOCLIP: ON", noclipOff = "NOCLIP: OFF",
-        bhopOn = "BHOP: ON", bhopOff = "BHOP: OFF",
-        antiFlingOn = "ANTI-FLING: ON", antiFlingOff = "ANTI-FLING: OFF",
-        killAuraOn = "KILL AURA: ON", killAuraOff = "KILL AURA: OFF",
-        farmOn = "FARM: ON", farmOff = "FARM: OFF",
-        langBtn = "RU",
-        clipUnavailable = "setclipboard unavailable",
-        autologinText = "AUTO-LOGIN...",
-        becameMurderer = " became MURDERER",
-        becameSheriff = " became SHERIFF",
-        wasKilled = " was killed",
-        noWeapon = "No weapon in hand",
-        coinFound = "Coin found, flying...",
-        noCoins = "No coins on map",
-        antiFlingWarn = "Anti-Fling: fling detected!"
+        menu = "FONDI MM2", esp = "ESP", outline = "Outline", tracers = "Tracers",
+        names = "Names", roles = "Roles", fly = "Fly", noclip = "Noclip",
+        bhop = "Bhop", antifling = "Anti-Fling", aimbot = "Aimbot (Sheriff)",
+        reveal = "Reveal Murderer", pickup = "Auto-Pickup", killall = "Kill All",
+        range = "Kill Aura Range", farm = "Farm (Coins)", notif = "Notifications",
+        langBtn = "RU", keyInput = "Enter key", activate = "Activate",
+        checking = "Checking...", autologin = "Auto-login...", accessOk = "Access granted",
+        keyInvalid = "Invalid key", keyExpired = "Session expired",
+        genKey = "Generate key", gen = "Generate", genTitle = "Generation",
+        copyKey = "Copy key", getScript = "Get script",
+        copied = "Copied!", linkCopied = "Link copied!",
+        murderer = "MURDERER", sheriff = "SHERIFF", wasKilled = "was killed",
+        becameM = "became MURDERER", becameS = "became SHERIFF", noPlayers = "No players",
+        noWeapon = "No weapon", flingTarget = "Fling player",
+        flingAll = "Fling all", flingRadius = "Fling radius",
+        on = "ON", off = "OFF", welcome = "FONDI MM2 Loaded!"
     }
 }
-
-local function T(key)
-    return (I18N[Lang] and I18N[Lang][key]) or key
-end
+local function T(k) return (I18N[Lang] and I18N[Lang][k]) or k end
 
 --==================================================
--- HELPERS
---==================================================
-local function Corner(p, r)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r or 8)
-    c.Parent = p
-    return c
-end
-
-local function Stroke(p, col, th)
-    local s = Instance.new("UIStroke")
-    s.Color = col or COLORS.Accent
-    s.Thickness = th or 1
-    s.Parent = p
-    return s
-end
-
-local function Tween(o, t, props, style, dir)
-    local info = TweenInfo.new(t or 0.3, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out)
-    local tw = TweenService:Create(o, info, props)
-    tw:Play()
-    return tw
-end
-
---==================================================
--- HTTP
+-- HTTP / AUTH
 --==================================================
 local function HttpPost(url, body)
     local json = HttpService:JSONEncode(body)
-    local ok, result = pcall(function()
-        if request then
-            return request({Url = url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = json})
-        elseif syn and syn.request then
-            return syn.request({Url = url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = json})
-        elseif http_request then
-            return http_request({Url = url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = json})
-        elseif fluxus and fluxus.request then
-            return fluxus.request({Url = url, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = json})
-        else
-            error("No HTTP method")
-        end
+    local ok, res = pcall(function()
+        if request then return request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json}) end
+        if syn and syn.request then return syn.request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json}) end
+        if http_request then return http_request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json}) end
+        error("No HTTP")
     end)
-    if not ok or not result then return nil, "HTTP failed" end
-    local ok2, data = pcall(function() return HttpService:JSONDecode(result.Body or result) end)
+    if not ok or not res then return nil, "HTTP failed" end
+    local ok2, data = pcall(function() return HttpService:JSONDecode(res.Body or res) end)
     if not ok2 then return nil, "Invalid JSON" end
     return data
 end
 
 local function GetHWID()
-    local ok, hwid = pcall(function()
+    local ok, h = pcall(function()
         if gethwid then return gethwid() end
         if syn and syn.get_hwid then return syn.get_hwid() end
         return tostring(LP.UserId)
     end)
-    return ok and hwid or tostring(LP.UserId)
+    return ok and h or tostring(LP.UserId)
 end
 
 local function ValidateKey(key)
-    local data, err = HttpPost(AUTH_URL, {
-        key = key, userId = tostring(LP.UserId), hwid = GetHWID(), lang = Lang
-    })
+    local data, err = HttpPost(AUTH_URL, {key=key, userId=tostring(LP.UserId), hwid=GetHWID(), lang=Lang})
     if not data then return false, err end
     if data.valid then return true, data end
-    return false, data.reason or T("invalidKey")
+    return false, data.reason or T("keyInvalid")
 end
 
-local function GenerateKeyRemote(duration)
-    local data, err = HttpPost(GENERATE_URL, {
-        duration = duration, userId = tostring(LP.UserId), lang = Lang
-    })
+local function GenerateKeyRemote(dur)
+    local data, err = HttpPost(GENERATE_URL, {duration=dur, userId=tostring(LP.UserId), lang=Lang})
     if not data then return nil, err end
     if data.error then return nil, data.error end
     return data.key, data
 end
 
---==================================================
--- SESSION
---==================================================
-local function SaveKey(key)
-    pcall(function() if writefile then writefile(KEY_FILE, key) end end)
-end
-
+local function SaveKey(k) pcall(function() if writefile then writefile(KEY_FILE, k) end end) end
 local function LoadKey()
-    local ok, content = pcall(function()
+    local ok, c = pcall(function()
         if readfile and isfile and isfile(KEY_FILE) then return readfile(KEY_FILE) end
-        return nil
     end)
-    if ok and content and content ~= "" then return content end
-    return nil
+    if ok and c and c ~= "" then return c end
 end
-
-local function ClearKey()
-    pcall(function() if delfile and isfile and isfile(KEY_FILE) then delfile(KEY_FILE) end end)
-end
-
-local function SaveLang(l)
-    pcall(function() if writefile then writefile(LANG_FILE, l) end end)
-end
-
+local function ClearKey() pcall(function() if delfile and isfile and isfile(KEY_FILE) then delfile(KEY_FILE) end end) end
+local function SaveLang(l) pcall(function() if writefile then writefile(LANG_FILE, l) end end) end
 local function LoadLang()
-    local ok, content = pcall(function()
+    local ok, c = pcall(function()
         if readfile and isfile and isfile(LANG_FILE) then return readfile(LANG_FILE) end
-        return nil
     end)
-    if ok and content and (content == "ru" or content == "en") then return content end
-    return nil
+    if ok and (c == "ru" or c == "en") then return c end
 end
 
 --==================================================
--- NOTIFY
+-- NOTIFY (Orion)
 --==================================================
-local function Notify(text, color, duration)
-    duration = duration or 3
-    local sg = pg:FindFirstChild("Fondi_Notify")
-    if not sg then
-        sg = Instance.new("ScreenGui")
-        sg.Name = "Fondi_Notify"
-        sg.ResetOnSpawn = false
-        sg.IgnoreGuiInset = true
-        sg.Parent = pg
-    end
-    color = color or COLORS.Accent
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 280, 0, 55)
-    frame.Position = UDim2.new(1, 20, 0.82, 0)
-    frame.BackgroundColor3 = COLORS.Card
-    frame.BackgroundTransparency = 0.05
-    frame.BorderSizePixel = 0
-    frame.Parent = sg
-    Corner(frame, 10)
-    local st = Stroke(frame, color, 1.5)
-
-    local accent = Instance.new("Frame")
-    accent.Size = UDim2.new(0, 3, 1, 0)
-    accent.BackgroundColor3 = color
-    accent.BorderSizePixel = 0
-    accent.Parent = frame
-    Corner(accent, 10)
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -20, 1, 0)
-    label.Position = UDim2.new(0, 15, 0, 0)
-    label.BackgroundTransparency = 1
-    label.Text = tostring(text)
-    label.TextColor3 = COLORS.Text
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 12
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextWrapped = true
-    label.Parent = frame
-
-    Tween(frame, 0.35, {Position = UDim2.new(1, -300, 0.82, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
-    task.delay(duration, function()
-        if frame and frame.Parent then
-            Tween(frame, 0.3, {Position = UDim2.new(1, 20, 0.82, 0), BackgroundTransparency = 1}, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-            Tween(label, 0.3, {TextTransparency = 1})
-            Tween(st, 0.3, {Transparency = 1})
-            task.wait(0.35)
-            if frame then frame:Destroy() end
-        end
-    end)
+local function Notify(title, content, duration)
+    OrionLib:MakeNotification({
+        Name = tostring(title),
+        Content = tostring(content or ""),
+        Image = "rbxassetid://4483345998",
+        Time = duration or 3
+    })
 end
 
 --==================================================
--- SOUND
+-- ROLE
 --==================================================
-local ToggleSound = Instance.new("Sound")
-ToggleSound.Name = "FondiToggleSound"
-ToggleSound.SoundId = "rbxassetid://133095302935970"
-ToggleSound.Volume = 0.5
-ToggleSound.Parent = SoundService
+local COLORS = {
+    Murderer = Color3.fromRGB(255, 60, 60),
+    Sheriff = Color3.fromRGB(60, 140, 255),
+    Innocent = Color3.fromRGB(60, 255, 120),
+    Dead = Color3.fromRGB(130, 130, 130)
+}
 
-local function PlayToggleSound()
-    pcall(function()
-        ToggleSound:Stop()
-        ToggleSound.TimePosition = 0
-        ToggleSound:Play()
-    end)
-end
-
---==================================================
--- ROLE / ESP
---==================================================
-local function GetRole(player)
-    if not player then return "Innocent" end
-    local char = player.Character
-    local bp = player:FindFirstChildOfClass("Backpack")
-    local function Has(c, n) return c and c:FindFirstChild(n) ~= nil end
-    if Has(char, "Knife") or Has(bp, "Knife") then return "Murderer" end
-    if Has(char, "Gun") or Has(bp, "Gun") or Has(char, "Revolver") or Has(bp, "Revolver") then return "Sheriff" end
+local function GetRole(pl)
+    if not pl then return "Innocent" end
+    local c, b = pl.Character, pl:FindFirstChildOfClass("Backpack")
+    local function H(t, n) return t and t:FindFirstChild(n) ~= nil end
+    if H(c, "Knife") or H(b, "Knife") then return "Murderer" end
+    if H(c, "Gun") or H(b, "Gun") or H(c, "Revolver") or H(b, "Revolver") then return "Sheriff" end
     return "Innocent"
 end
 
-local function GetRoleColor(role) return COLORS[role] or COLORS.Innocent end
+--==================================================
+-- ESP
+--==================================================
+local ESPObjects, Connections = {}, {}
+local lastRoles = {}
 
-local ESPObjects, PlayerConnections = {}, {}
-local lastRoles = {}  -- для notification: player -> роль
-
-local function RemoveESP(player)
-    local d = ESPObjects[player]
+local function RemoveESP(pl)
+    local d = ESPObjects[pl]
     if not d then return end
-    for _, k in ipairs({"Highlight", "Billboard", "Tracer", "TracerStart", "TracerEnd"}) do
+    for _, k in ipairs({"HL","BB","Beam","A0","A1"}) do
         if d[k] then pcall(function() d[k]:Destroy() end) end
     end
-    ESPObjects[player] = nil
+    ESPObjects[pl] = nil
 end
 
-local UpdateESP
-
-local function CreateESP(player)
-    if player == LP or not player.Parent then return end
-    local char = player.Character
-    if not char then return end
-    if not char:FindFirstChildOfClass("Humanoid") or not char:FindFirstChild("HumanoidRootPart") then return end
-    RemoveESP(player)
-    local root = char.HumanoidRootPart
-    local data = {Character = char, Root = root}
+local function CreateESP(pl)
+    if pl == LP or not pl.Parent then return end
+    local c = pl.Character
+    if not c or not c:FindFirstChild("HumanoidRootPart") then return end
+    RemoveESP(pl)
+    local root = c.HumanoidRootPart
+    local d = {Char = c, Root = root}
 
     local hl = Instance.new("Highlight")
-    hl.Name = "FondiHighlight"
-    hl.Adornee = char
+    hl.Name = "FondiHL"; hl.Adornee = c
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     hl.FillTransparency = 0.78
-    hl.OutlineTransparency = Settings.Outline and 0 or 1
-    hl.Parent = char
-    data.Highlight = hl
+    hl.Parent = c
+    d.HL = hl
 
     local bb = Instance.new("BillboardGui")
-    bb.Name = "FondiName"
-    bb.Adornee = root
-    bb.Size = UDim2.new(0, 220, 0, 50)
-    bb.StudsOffset = Vector3.new(0, 3.2, 0)
-    bb.AlwaysOnTop = true
-    bb.MaxDistance = 10000
-    bb.Parent = root
+    bb.Name = "FondiBB"; bb.Adornee = root
+    bb.Size = UDim2.new(0, 220, 0, 50); bb.StudsOffset = Vector3.new(0, 3.2, 0)
+    bb.AlwaysOnTop = true; bb.MaxDistance = 10000; bb.Parent = root
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, 0, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.TextStrokeTransparency = 0
-    lbl.TextStrokeColor3 = Color3.new(0,0,0)
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextSize = 14
+    lbl.Size = UDim2.new(1,0,1,0); lbl.BackgroundTransparency = 1
+    lbl.TextStrokeTransparency = 0; lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 14
     lbl.Parent = bb
-    data.Billboard = bb
-    data.Label = lbl
+    d.BB = bb; d.Lbl = lbl
 
-    local attachEnd = Instance.new("Attachment")
-    attachEnd.Name = "FondiTracerEnd"
-    attachEnd.Parent = root
-    data.TracerEnd = attachEnd
+    local a1 = Instance.new("Attachment"); a1.Name = "FondiA1"; a1.Parent = root
+    d.A1 = a1
+    local beam = Instance.new("Beam")
+    beam.Name = "FondiBeam"; beam.FaceCamera = true
+    beam.Width0 = 0.04; beam.Width1 = 0.04
+    beam.Transparency = NumberSequence.new(0.15)
+    beam.Attachment1 = a1; beam.Parent = root
+    d.Beam = beam
 
-    local tracer = Instance.new("Beam")
-    tracer.Name = "FondiTracer"
-    tracer.FaceCamera = true
-    tracer.Width0 = 0.04
-    tracer.Width1 = 0.04
-    tracer.Transparency = NumberSequence.new(0.15)
-    tracer.Attachment1 = attachEnd
-    tracer.Parent = root
-    data.Tracer = tracer
-
-    ESPObjects[player] = data
-    UpdateESP(player)
+    ESPObjects[pl] = d
 end
 
-UpdateESP = function(player)
-    if player == LP then return end
-    local d = ESPObjects[player]
-    if not d then return end
-    local char = player.Character
-    if not char then RemoveESP(player); return end
-    if d.Character ~= char then CreateESP(player); return end
+local function UpdateESP(pl)
+    if pl == LP then return end
+    local d = ESPObjects[pl]; if not d then return end
+    local c = pl.Character
+    if not c then RemoveESP(pl); return end
+    if d.Char ~= c then CreateESP(pl); return end
 
-    local role = GetRole(player)
-    local rc = GetRoleColor(role)
+    local role = GetRole(pl)
+    local rc = COLORS[role] or COLORS.Innocent
 
-    if d.Highlight and d.Highlight.Parent then
-        d.Highlight.Adornee = char
-        d.Highlight.Enabled = Settings.ESP
-        d.Highlight.FillColor = rc
-        d.Highlight.OutlineColor = rc
-        d.Highlight.OutlineTransparency = Settings.Outline and 0 or 1
+    if d.HL and d.HL.Parent then
+        d.HL.Adornee = c
+        d.HL.Enabled = Settings.ESP
+        d.HL.FillColor = rc; d.HL.OutlineColor = rc
+        d.HL.OutlineTransparency = Settings.Outline and 0 or 1
     end
-
-    if d.Billboard and d.Billboard.Parent and d.Label then
-        d.Billboard.Adornee = d.Root
-        d.Billboard.Enabled = Settings.ESP and Settings.ShowNames
-        d.Label.Text = Settings.ShowRoles and (player.DisplayName .. "\n" .. role) or player.DisplayName
-        d.Label.TextColor3 = rc
+    if d.BB and d.BB.Parent and d.Lbl then
+        d.BB.Adornee = d.Root
+        d.BB.Enabled = Settings.ESP and Settings.ShowNames
+        d.Lbl.Text = Settings.ShowRoles and (pl.DisplayName .. "\n" .. role) or pl.DisplayName
+        d.Lbl.TextColor3 = rc
     end
-
-    if d.Tracer and d.Tracer.Parent then
-        d.Tracer.Enabled = Settings.ESP and Settings.Tracers
-        d.Tracer.Color = ColorSequence.new(rc)
-        if d.TracerEnd then
-            if d.TracerEnd.Parent ~= d.Root then d.TracerEnd.Parent = d.Root end
-            d.Tracer.Attachment1 = d.TracerEnd
-        end
-        local myChar = LP.Character
-        if myChar then
-            local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-            if myRoot then
-                if not d.TracerStart or not d.TracerStart.Parent then
-                    local ns = Instance.new("Attachment")
-                    ns.Name = "FondiTracerStart"
-                    ns.Parent = myRoot
-                    d.TracerStart = ns
-                elseif d.TracerStart.Parent ~= myRoot then
-                    d.TracerStart.Parent = myRoot
-                end
-                d.Tracer.Attachment0 = d.TracerStart
+    if d.Beam and d.Beam.Parent then
+        d.Beam.Enabled = Settings.ESP and Settings.Tracers
+        d.Beam.Color = ColorSequence.new(rc)
+        if d.A1 and d.A1.Parent ~= d.Root then d.A1.Parent = d.Root end
+        d.Beam.Attachment1 = d.A1
+        local my = LP.Character
+        if my then
+            local mr = my:FindFirstChild("HumanoidRootPart")
+            if mr then
+                if not d.A0 or not d.A0.Parent then
+                    local a0 = Instance.new("Attachment"); a0.Name = "FondiA0"; a0.Parent = mr
+                    d.A0 = a0
+                elseif d.A0.Parent ~= mr then d.A0.Parent = mr end
+                d.Beam.Attachment0 = d.A0
             end
         end
     end
 end
 
---==================================================
--- NOTIFICATION: Kill/Sheriff
---==================================================
-local function CheckRoleChange(player)
-    if not Settings.Notifications then return end
-    if player == LP then return end
-    local role = GetRole(player)
-    local last = lastRoles[player]
-    if last ~= role then
-        lastRoles[player] = role
-        if role == "Murderer" and last ~= "Murderer" then
-            Notify(player.DisplayName .. T("becameMurderer"), COLORS.Murderer)
-        elseif role == "Sheriff" and last ~= "Sheriff" then
-            Notify(player.DisplayName .. T("becameSheriff"), COLORS.Sheriff)
-        end
+local function SetupPlayer(pl)
+    if pl == LP then return end
+    if Connections[pl] then
+        for _, c in ipairs(Connections[pl]) do pcall(function() c:Disconnect() end) end
     end
-end
+    Connections[pl] = {}
 
---==================================================
--- SETUP PLAYERS
---==================================================
-local function DisconnectPlayer(player)
-    local c = PlayerConnections[player]
-    if not c then return end
-    for _, con in ipairs(c) do pcall(function() con:Disconnect() end) end
-    PlayerConnections[player] = nil
-end
-
-local function SetupPlayer(player)
-    if player == LP then return end
-    DisconnectPlayer(player)
-    PlayerConnections[player] = {}
-
-    -- Отслеживание смерти
-    local function watchHumanoid(char)
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            local diedConn = hum.Died:Connect(function()
-                if Settings.Notifications then
-                    local myChar = LP.Character
-                    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-                    -- Если умер не я и не от моей руки — уведомление
-                    if player ~= LP then
-                        Notify(player.DisplayName .. T("wasKilled"), COLORS.Dead, 2)
-                    end
-                end
-            end)
-            table.insert(PlayerConnections[player], diedConn)
-        end
-    end
-
-    local ca = player.CharacterAdded:Connect(function(char)
-        RemoveESP(player)
-        char:WaitForChild("HumanoidRootPart", 10)
-        watchHumanoid(char)
+    local ca = pl.CharacterAdded:Connect(function(c)
+        RemoveESP(pl)
+        c:WaitForChild("HumanoidRootPart", 10)
         task.wait(0.25)
-        if player.Parent and player.Character == char and Settings.ESP then
-            CreateESP(player)
-        end
-        CheckRoleChange(player)
+        if pl.Character == c and Settings.ESP then CreateESP(pl) end
     end)
-    table.insert(PlayerConnections[player], ca)
+    table.insert(Connections[pl], ca)
 
-    local cr = player.CharacterRemoving:Connect(function(char)
-        local d = ESPObjects[player]
-        if d and d.Character == char then RemoveESP(player) end
+    local cr = pl.CharacterRemoving:Connect(function(c)
+        local d = ESPObjects[pl]
+        if d and d.Char == c then RemoveESP(pl) end
     end)
-    table.insert(PlayerConnections[player], cr)
+    table.insert(Connections[pl], cr)
 
-    local bp = player:FindFirstChildOfClass("Backpack")
-    if bp then
-        local a = bp.ChildAdded:Connect(function()
-            task.wait(0.05)
-            if Settings.ESP then UpdateESP(player) end
-            CheckRoleChange(player)
-        end)
-        local r = bp.ChildRemoved:Connect(function()
-            task.wait(0.05)
-            if Settings.ESP then UpdateESP(player) end
-            CheckRoleChange(player)
-        end)
-        table.insert(PlayerConnections[player], a)
-        table.insert(PlayerConnections[player], r)
-    end
-
-    if player.Character then
+    if pl.Character then
         task.spawn(function()
-            local char = player.Character
-            char:WaitForChild("HumanoidRootPart", 5)
-            watchHumanoid(char)
-            if player.Character == char and Settings.ESP then
-                task.wait(0.2)
-                CreateESP(player)
-            end
-            CheckRoleChange(player)
+            local c = pl.Character
+            c:WaitForChild("HumanoidRootPart", 5)
+            if pl.Character == c and Settings.ESP then task.wait(0.2); CreateESP(pl) end
         end)
     end
 end
 
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LP then SetupPlayer(p) end
+for _, pl in ipairs(Players:GetPlayers()) do
+    if pl ~= LP then SetupPlayer(pl) end
 end
-
 Players.PlayerAdded:Connect(SetupPlayer)
-Players.PlayerRemoving:Connect(function(p)
-    RemoveESP(p)
-    DisconnectPlayer(p)
-    lastRoles[p] = nil
+Players.PlayerRemoving:Connect(function(pl)
+    RemoveESP(pl)
+    lastRoles[pl] = nil
+    if Connections[pl] then
+        for _, c in ipairs(Connections[pl]) do pcall(function() c:Disconnect() end) end
+        Connections[pl] = nil
+    end
 end)
 
+--==================================================
+-- REVEAL MURDERER
+--==================================================
 task.spawn(function()
-    while task.wait(0.5) do
-        if IsAuthenticated then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Parent then
-                    CheckRoleChange(p)
-                    if Settings.ESP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        local d = ESPObjects[p]
-                        if not d or d.Character ~= p.Character
-                            or not d.Highlight or not d.Highlight.Parent
-                            or not d.Billboard or not d.Billboard.Parent then
-                            CreateESP(p)
-                        else
-                            UpdateESP(p)
+    while task.wait(0.3) do
+        if IsAuthenticated and Settings.RevealMurderer then
+            for _, pl in ipairs(Players:GetPlayers()) do
+                if pl ~= LP then
+                    local role = GetRole(pl)
+                    local last = lastRoles[pl]
+                    if role ~= last then
+                        lastRoles[pl] = role
+                        if role == "Murderer" and last ~= "Murderer" then
+                            Notify(T("murderer"), pl.DisplayName .. " " .. T("becameM"), 4)
+                        elseif role == "Sheriff" and last ~= "Sheriff" then
+                            Notify(T("sheriff"), pl.DisplayName .. " " .. T("becameS"), 4)
                         end
                     end
                 end
@@ -644,35 +341,24 @@ end)
 --==================================================
 -- NOCLIP
 --==================================================
-local noclipConnection = nil
-
+local noclipConn = nil
 local function StopNoclip()
-    if noclipConnection then
-        noclipConnection:Disconnect()
-        noclipConnection = nil
-    end
+    if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
     local c = LP.Character
     if c then
         for _, o in ipairs(c:GetDescendants()) do
-            if o:IsA("BasePart") then
-                pcall(function() o.CanCollide = true end)
-            end
+            if o:IsA("BasePart") then pcall(function() o.CanCollide = true end) end
         end
     end
 end
-
 local function StartNoclip()
     StopNoclip()
-    noclipConnection = RunService.Stepped:Connect(function()
+    noclipConn = RunService.Stepped:Connect(function()
         if not IsAuthenticated or not Settings.Noclip then return end
         local c = LP.Character
         if not c then return end
         for _, o in ipairs(c:GetDescendants()) do
-            if o:IsA("BasePart") then
-                if o.CanCollide then
-                    o.CanCollide = false
-                end
-            end
+            if o:IsA("BasePart") and o.CanCollide then o.CanCollide = false end
         end
     end)
 end
@@ -680,82 +366,54 @@ end
 --==================================================
 -- FLY
 --==================================================
-local flyConnection = nil
-local flyActive = false
-
+local flyConn, flyActive = nil, false
 local function StopFly()
     flyActive = false
-    if flyConnection then
-        flyConnection:Disconnect()
-        flyConnection = nil
-    end
+    if flyConn then flyConn:Disconnect(); flyConn = nil end
     local c = LP.Character
     if c then
         local h = c:FindFirstChildOfClass("Humanoid")
-        if h then
-            pcall(function() h.PlatformStand = false end)
-        end
+        if h then pcall(function() h.PlatformStand = false end) end
     end
 end
-
 local function StartFly()
     StopFly()
     flyActive = true
-
-    flyConnection = RunService.RenderStepped:Connect(function(dt)
+    flyConn = RunService.RenderStepped:Connect(function(dt)
         if not IsAuthenticated or not Settings.Fly or not flyActive then return end
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
         local h = c:FindFirstChildOfClass("Humanoid")
         if not r or not h then return end
-
         h.PlatformStand = true
         r.Velocity = Vector3.zero
         r.RotVelocity = Vector3.zero
-
         local cam = workspace.CurrentCamera
         if not cam then return end
-
         local move = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
         if UIS:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
         if UIS:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
         if UIS:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0, 1, 0) end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0, 1, 0) end
-
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
         if move.Magnitude > 0 then
-            local speed = Settings.FlySpeed
-            local delta = move.Unit * speed * dt
-            r.CFrame = r.CFrame + delta
+            r.CFrame = r.CFrame + (move.Unit * Settings.FlySpeed * dt)
         end
     end)
 end
 
-LP.CharacterAdded:Connect(function()
-    StopFly()
-    StopNoclip()
-    task.wait(0.5)
-    if Settings.Fly and IsAuthenticated then StartFly() end
-    if Settings.Noclip and IsAuthenticated then StartNoclip() end
-end)
-
 --==================================================
 -- BHOP
 --==================================================
-local bhopConnection = nil
-
+local bhopConn = nil
 local function StopBhop()
-    if bhopConnection then
-        bhopConnection:Disconnect()
-        bhopConnection = nil
-    end
+    if bhopConn then bhopConn:Disconnect(); bhopConn = nil end
 end
-
 local function StartBhop()
     StopBhop()
-    bhopConnection = RunService.Heartbeat:Connect(function()
+    bhopConn = RunService.Heartbeat:Connect(function()
         if not IsAuthenticated or not Settings.Bhop then return end
         if not UIS:IsKeyDown(Enum.KeyCode.Space) then return end
         local c = LP.Character
@@ -772,24 +430,18 @@ end
 --==================================================
 -- ANTI-FLING
 --==================================================
-local antiflingConnection = nil
-
+local afConn = nil
 local function StopAntiFling()
-    if antiflingConnection then
-        antiflingConnection:Disconnect()
-        antiflingConnection = nil
-    end
+    if afConn then afConn:Disconnect(); afConn = nil end
 end
-
 local function StartAntiFling()
     StopAntiFling()
-    antiflingConnection = RunService.Heartbeat:Connect(function()
+    afConn = RunService.Heartbeat:Connect(function()
         if not IsAuthenticated or not Settings.AntiFling then return end
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
-        -- Если есть подозрительные силы / velocity
         if r.Velocity.Magnitude > 200 or r.RotVelocity.Magnitude > 100 then
             r.Velocity = Vector3.zero
             r.RotVelocity = Vector3.zero
@@ -798,906 +450,388 @@ local function StartAntiFling()
 end
 
 --==================================================
--- KILL AURA
+-- AIMBOT (Sheriff)
 --==================================================
-local killAuraConnection = nil
-
-local function GetWeapon()
-    local char = LP.Character
-    if not char then return nil end
-    for _, tool in ipairs(char:GetChildren()) do
-        if tool:IsA("Tool") then
-            if tool.Name == "Knife" or tool.Name == "Gun" or tool.Name == "Revolver" then
-                return tool
-            end
-        end
-    end
-    return nil
+local aimbotConn = nil
+local function StopAimbot()
+    if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end
 end
-
-local function StopKillAura()
-    if killAuraConnection then
-        killAuraConnection:Disconnect()
-        killAuraConnection = nil
-    end
-end
-
-local function StartKillAura()
-    StopKillAura()
-    killAuraConnection = RunService.Heartbeat:Connect(function()
-        if not IsAuthenticated or not Settings.KillAura then return end
-        local char = LP.Character
-        if not char then return end
-        local myRoot = char:FindFirstChild("HumanoidRootPart")
-        local myHum = char:FindFirstChildOfClass("Humanoid")
-        if not myRoot or not myHum then return end
-
-        local weapon = GetWeapon()
-        if not weapon then return end
-
-        -- Ищем ближайшего Murderer
-        local closest = nil
-        local minDist = Settings.KillAuraRange
+local function StartAimbot()
+    StopAimbot()
+    aimbotConn = RunService.RenderStepped:Connect(function()
+        if not IsAuthenticated or not Settings.Aimbot then return end
+        if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+        local closest, minDist = nil, 200
         for _, pl in ipairs(Players:GetPlayers()) do
-            if pl ~= LP and pl.Character then
-                local role = GetRole(pl)
-                if role == "Murderer" then
-                    local theirRoot = pl.Character:FindFirstChild("HumanoidRootPart")
-                    if theirRoot then
-                        local dist = (theirRoot.Position - myRoot.Position).Magnitude
-                        if dist < minDist then
-                            minDist = dist
-                            closest = pl
-                        end
+            if pl ~= LP and pl.Character and GetRole(pl) == "Murderer" then
+                local head = pl.Character:FindFirstChild("Head")
+                if head then
+                    local pos, vis = cam:WorldToViewportPoint(head.Position)
+                    if vis then
+                        local d = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
+                        if d < minDist then minDist = d; closest = pl end
                     end
                 end
             end
         end
+        if closest then
+            cam.CFrame = cam.CFrame:Lerp(CFrame.new(cam.CFrame.Position, closest.Character.Head.Position), 0.2)
+        end
+    end)
+end
 
-        if closest and closest.Character then
-            local targetRoot = closest.Character:FindFirstChild("HumanoidRootPart")
-            if targetRoot then
-                -- Поворачиваемся к цели и атакуем
-                myRoot.CFrame = CFrame.new(myRoot.Position, Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z))
-                pcall(function() weapon:Activate() end)
+--==================================================
+-- AUTO-PICKUP
+--==================================================
+local pickupConn = nil
+local function StopPickup()
+    if pickupConn then pickupConn:Disconnect(); pickupConn = nil end
+end
+local function StartPickup()
+    StopPickup()
+    pickupConn = RunService.Heartbeat:Connect(function()
+        if not IsAuthenticated or not Settings.AutoPickup then return end
+        local c = LP.Character
+        if not c then return end
+        local r = c:FindFirstChild("HumanoidRootPart")
+        if not r then return end
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name:lower():find("gun") or obj.Name:lower():find("revolver") or obj.Name:lower():find("dropped")) then
+                if (obj.Position - r.Position).Magnitude < 50 then
+                    r.CFrame = CFrame.new(obj.Position + Vector3.new(0, 3, 0))
+                end
             end
         end
     end)
 end
 
 --==================================================
--- COIN / GEM FARM
+-- KILL ALL
 --==================================================
-local farmConnection = nil
-local originalFly = false
-local originalNoclip = false
-local originalFlySpeed = 55
-
-local function StopFarm()
-    if farmConnection then
-        farmConnection:Disconnect()
-        farmConnection = nil
+local killAllConn = nil
+local function GetWeapon()
+    local c = LP.Character
+    if not c then return nil end
+    for _, t in ipairs(c:GetChildren()) do
+        if t:IsA("Tool") and (t.Name == "Knife" or t.Name == "Gun" or t.Name == "Revolver") then
+            return t
+        end
     end
-    -- Восстанавливаем исходные Fly/Noclip если ферма их включала
-    if originalFly ~= Settings.Fly then
-        Settings.Fly = originalFly
-        if Settings.Fly then StartFly() else StopFly() end
-    end
-    if originalNoclip ~= Settings.Noclip then
-        Settings.Noclip = originalNoclip
-        if Settings.Noclip then StartNoclip() else StopNoclip() end
-    end
-    Settings.FlySpeed = originalFlySpeed
 end
-
-local function FindClosestCoin()
-    local myChar = LP.Character
-    if not myChar then return nil end
-    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return nil end
-
-    local closest, minDist = nil, math.huge
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            local name = obj.Name:lower()
-            if name:find("coin") or name:find("gem") or name:find("money") then
-                local dist = (obj.Position - myRoot.Position).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    closest = obj
+local function StopKillAll()
+    if killAllConn then killAllConn:Disconnect(); killAllConn = nil end
+end
+local function StartKillAll()
+    StopKillAll()
+    killAllConn = RunService.Heartbeat:Connect(function()
+        if not IsAuthenticated or not Settings.KillAll then return end
+        local c = LP.Character
+        if not c then return end
+        local r = c:FindFirstChild("HumanoidRootPart")
+        local w = GetWeapon()
+        if not r or not w then return end
+        for _, pl in ipairs(Players:GetPlayers()) do
+            if pl ~= LP and pl.Character then
+                local tr = pl.Character:FindFirstChild("HumanoidRootPart")
+                if tr and (tr.Position - r.Position).Magnitude < Settings.KillAuraRange then
+                    r.CFrame = CFrame.new(r.Position, Vector3.new(tr.Position.X, r.Position.Y, tr.Position.Z))
+                    pcall(function() w:Activate() end)
                 end
             end
         end
-    end
-    return closest
+    end)
 end
 
+--==================================================
+-- FLING
+--==================================================
+local function FlingPlayer(target)
+    if not target or not target.Character then return end
+    local tr = target.Character:FindFirstChild("HumanoidRootPart")
+    if not tr then return end
+    local bv = Instance.new("BodyVelocity", tr)
+    bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bv.Velocity = Vector3.new(99999, 99999, 99999)
+    task.delay(0.15, function() pcall(function() bv:Destroy() end) end)
+    Notify("FLING", target.DisplayName, 2)
+end
+
+--==================================================
+-- FARM (Coins)
+--==================================================
+local farmConn = nil
+local function StopFarm()
+    if farmConn then farmConn:Disconnect(); farmConn = nil end
+end
 local function StartFarm()
     StopFarm()
-    originalFly = Settings.Fly
-    originalNoclip = Settings.Noclip
-    originalFlySpeed = Settings.FlySpeed
-
-    Settings.Fly = true
-    Settings.FlySpeed = 80
-    if not flyActive then StartFly() end
-
-    farmConnection = RunService.Heartbeat:Connect(function()
+    farmConn = RunService.Heartbeat:Connect(function()
         if not IsAuthenticated or not Settings.Farm then return end
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
-
-        local coin = FindClosestCoin()
-        if coin then
-            r.CFrame = CFrame.new(coin.Position + Vector3.new(0, 2, 0))
+        local closest, minDist = nil, math.huge
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name:lower():find("coin") or obj.Name:lower():find("gem") or obj.Name:lower():find("money")) then
+                local d = (obj.Position - r.Position).Magnitude
+                if d < minDist then minDist = d; closest = obj end
+            end
+        end
+        if closest then
+            r.CFrame = CFrame.new(closest.Position + Vector3.new(0, 2, 0))
         end
     end)
 end
 
 --==================================================
--- KEY GUI
+-- ANTI-KICK WARNING
 --==================================================
-local KeyGui = Instance.new("ScreenGui")
-KeyGui.Name = "FondiKeyGui"
-KeyGui.ResetOnSpawn = false
-KeyGui.IgnoreGuiInset = true
-KeyGui.Parent = pg
-
-local backdrop = Instance.new("Frame", KeyGui)
-backdrop.Size = UDim2.new(1, 0, 1, 0)
-backdrop.BackgroundColor3 = Color3.new(0, 0, 0)
-backdrop.BackgroundTransparency = 0.5
-backdrop.BorderSizePixel = 0
-
-local KeyFrame = Instance.new("Frame", KeyGui)
-KeyFrame.Size = UDim2.new(0, 400, 0, 530)
-KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -265)
-KeyFrame.BackgroundColor3 = COLORS.Card
-KeyFrame.BackgroundTransparency = 0.03
-KeyFrame.BorderSizePixel = 0
-KeyFrame.Active = true
-Corner(KeyFrame, 18)
-Stroke(KeyFrame, COLORS.Accent, 1.5)
-
-local keyLangBtn = Instance.new("TextButton", KeyFrame)
-keyLangBtn.Size = UDim2.new(0, 50, 0, 26)
-keyLangBtn.Position = UDim2.new(1, -62, 0, 10)
-keyLangBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
-keyLangBtn.Text = T("langBtn")
-keyLangBtn.TextColor3 = COLORS.Accent2
-keyLangBtn.Font = Enum.Font.GothamBold
-keyLangBtn.TextSize = 12
-keyLangBtn.BorderSizePixel = 0
-keyLangBtn.AutoButtonColor = false
-Corner(keyLangBtn, 8)
-Stroke(keyLangBtn, COLORS.Accent2, 1)
-
-local keyHeader = Instance.new("TextLabel", KeyFrame)
-keyHeader.Size = UDim2.new(1, 0, 0, 42)
-keyHeader.Position = UDim2.new(0, 0, 0, 30)
-keyHeader.BackgroundTransparency = 1
-keyHeader.Text = T("menuTitle")
-keyHeader.TextColor3 = COLORS.Text
-keyHeader.Font = Enum.Font.GothamBold
-keyHeader.TextSize = 26
-
-local keySub = Instance.new("TextLabel", KeyFrame)
-keySub.Size = UDim2.new(1, 0, 0, 18)
-keySub.Position = UDim2.new(0, 0, 0, 72)
-keySub.BackgroundTransparency = 1
-keySub.Text = "V7.0 • EXTENDED"
-keySub.TextColor3 = COLORS.Accent2
-keySub.Font = Enum.Font.GothamBold
-keySub.TextSize = 11
-
-local KeyBox = Instance.new("TextBox", KeyFrame)
-KeyBox.Size = UDim2.new(0.85, 0, 0, 46)
-KeyBox.Position = UDim2.new(0.075, 0, 0, 115)
-KeyBox.PlaceholderText = T("keyInput")
-KeyBox.Text = ""
-KeyBox.ClearTextOnFocus = false
-KeyBox.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
-KeyBox.TextColor3 = COLORS.Text
-KeyBox.PlaceholderColor3 = COLORS.SubText
-KeyBox.Font = Enum.Font.Code
-KeyBox.TextSize = 14
-KeyBox.BorderSizePixel = 0
-Corner(KeyBox, 10)
-Stroke(KeyBox, Color3.fromRGB(45, 45, 65), 1)
-
-local ActivateBtn = Instance.new("TextButton", KeyFrame)
-ActivateBtn.Size = UDim2.new(0.85, 0, 0, 46)
-ActivateBtn.Position = UDim2.new(0.075, 0, 0, 172)
-ActivateBtn.Text = T("activate")
-ActivateBtn.BackgroundColor3 = COLORS.Accent
-ActivateBtn.TextColor3 = COLORS.Text
-ActivateBtn.Font = Enum.Font.GothamBold
-ActivateBtn.TextSize = 14
-ActivateBtn.BorderSizePixel = 0
-ActivateBtn.AutoButtonColor = false
-Corner(ActivateBtn, 10)
-
-local divider = Instance.new("Frame", KeyFrame)
-divider.Size = UDim2.new(0.85, 0, 0, 1)
-divider.Position = UDim2.new(0.075, 0, 0, 240)
-divider.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-divider.BorderSizePixel = 0
-
-local genTitle = Instance.new("TextLabel", KeyFrame)
-genTitle.Size = UDim2.new(1, 0, 0, 20)
-genTitle.Position = UDim2.new(0, 0, 0, 255)
-genTitle.BackgroundTransparency = 1
-genTitle.Text = T("genTitle")
-genTitle.TextColor3 = COLORS.SubText
-genTitle.Font = Enum.Font.GothamBold
-genTitle.TextSize = 11
-
-local durFrame = Instance.new("Frame", KeyFrame)
-durFrame.Size = UDim2.new(0.85, 0, 0, 34)
-durFrame.Position = UDim2.new(0.075, 0, 0, 285)
-durFrame.BackgroundTransparency = 1
-local durLayout = Instance.new("UIListLayout", durFrame)
-durLayout.FillDirection = Enum.FillDirection.Horizontal
-durLayout.Padding = UDim.new(0, 6)
-durLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-local DURATIONS = {
-    {label = "1D", value = "1d"},
-    {label = "7D", value = "7d"},
-    {label = "30D", value = "30d"},
-    {label = "∞", value = "inf"}
-}
-
-local selectedDuration = "1d"
-local durButtons = {}
-
-for _, opt in ipairs(DURATIONS) do
-    local b = Instance.new("TextButton", durFrame)
-    b.Size = UDim2.new(0, 74, 1, 0)
-    b.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
-    b.Text = opt.label
-    b.TextColor3 = COLORS.SubText
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 12
-    b.BorderSizePixel = 0
-    b.AutoButtonColor = false
-    Corner(b, 8)
-    local bs = Stroke(b, Color3.fromRGB(45, 45, 65), 1)
-
-    b.MouseButton1Click:Connect(function()
-        selectedDuration = opt.value
-        for _, other in ipairs(durButtons) do
-            Tween(other.btn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)})
-            other.btn.TextColor3 = COLORS.SubText
-            other.stroke.Color = Color3.fromRGB(45, 45, 65)
-        end
-        Tween(b, 0.2, {BackgroundColor3 = COLORS.Accent})
-        b.TextColor3 = COLORS.Text
-        bs.Color = COLORS.Accent2
-        PlayToggleSound()
+local oldKick = hookfunction or hookfunc
+if oldKick and LP.Kick then
+    pcall(function()
+        oldKick(LP.Kick, function(self, msg)
+            Notify("ANTI-KICK", "Попытка кика: " .. tostring(msg), 10)
+            task.wait(0.1)
+            return LP.Kick(self, msg)
+        end)
     end)
-    table.insert(durButtons, {btn = b, stroke = bs})
 end
 
-durButtons[1].btn.BackgroundColor3 = COLORS.Accent
-durButtons[1].btn.TextColor3 = COLORS.Text
-durButtons[1].stroke.Color = COLORS.Accent2
+--==================================================
+-- BUILD UI
+--==================================================
+local Window = OrionLib:MakeWindow({
+    Name = T("menu"),
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "FondiConfig",
+    IntroEnabled = true,
+    IntroText = "FONDI MM2",
+    IntroIcon = "rbxassetid://4483345998"
+})
 
-local GenBtn = Instance.new("TextButton", KeyFrame)
-GenBtn.Size = UDim2.new(0.85, 0, 0, 42)
-GenBtn.Position = UDim2.new(0.075, 0, 0, 335)
-GenBtn.Text = T("generate")
-GenBtn.BackgroundColor3 = COLORS.Success
-GenBtn.TextColor3 = COLORS.Text
-GenBtn.Font = Enum.Font.GothamBold
-GenBtn.TextSize = 13
-GenBtn.BorderSizePixel = 0
-GenBtn.AutoButtonColor = false
-Corner(GenBtn, 10)
+local MainTab = Window:MakeTab({Name = "Main", Icon = "rbxassetid://4483345998"})
+local CombatTab = Window:MakeTab({Name = "Combat", Icon = "rbxassetid://4483345998"})
+local FarmTab = Window:MakeTab({Name = "Farm", Icon = "rbxassetid://4483345998"})
+local MiscTab = Window:MakeTab({Name = "Misc", Icon = "rbxassetid://4483345998"})
+local SettingsTab = Window:MakeTab({Name = "Settings", Icon = "rbxassetid://4483345998"})
 
-local CopyBtn = Instance.new("TextButton", KeyFrame)
-CopyBtn.Size = UDim2.new(0.85, 0, 0, 42)
-CopyBtn.Position = UDim2.new(0.075, 0, 0, 388)
-CopyBtn.Text = T("copyKey")
-CopyBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
-CopyBtn.TextColor3 = COLORS.Accent2
-CopyBtn.Font = Enum.Font.GothamBold
-CopyBtn.TextSize = 13
-CopyBtn.BorderSizePixel = 0
-CopyBtn.AutoButtonColor = false
-Corner(CopyBtn, 10)
-Stroke(CopyBtn, COLORS.Accent2, 1)
+-- MAIN TAB
+local MainSec = MainTab:AddSection({Name = "ESP"})
+MainSec:AddToggle({Name = T("esp"), Default = false, Flag = "esp", Save = true, Callback = function(v)
+    Settings.ESP = v
+    if v then for _, p in ipairs(Players:GetPlayers()) do if p ~= LP then CreateESP(p) end end
+    else for p, _ in pairs(ESPObjects) do RemoveESP(p) end end
+end})
+MainSec:AddToggle({Name = T("outline"), Default = true, Flag = "outline", Save = true, Callback = function(v) Settings.Outline = v end})
+MainSec:AddToggle({Name = T("tracers"), Default = true, Flag = "tracers", Save = true, Callback = function(v) Settings.Tracers = v end})
+MainSec:AddToggle({Name = T("names"), Default = true, Flag = "names", Save = true, Callback = function(v) Settings.ShowNames = v end})
+MainSec:AddToggle({Name = T("roles"), Default = true, Flag = "roles", Save = true, Callback = function(v) Settings.ShowRoles = v end})
 
-local GetScriptBtn = Instance.new("TextButton", KeyFrame)
-GetScriptBtn.Size = UDim2.new(0.85, 0, 0, 42)
-GetScriptBtn.Position = UDim2.new(0.075, 0, 0, 441)
-GetScriptBtn.Text = T("getScript")
-GetScriptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
-GetScriptBtn.TextColor3 = COLORS.Accent2
-GetScriptBtn.Font = Enum.Font.GothamBold
-GetScriptBtn.TextSize = 13
-GetScriptBtn.BorderSizePixel = 0
-GetScriptBtn.AutoButtonColor = false
-Corner(GetScriptBtn, 10)
-Stroke(GetScriptBtn, COLORS.Accent2, 1)
+local MoveSec = MainTab:AddSection({Name = "Movement"})
+MoveSec:AddToggle({Name = T("fly"), Default = false, Flag = "fly", Save = true, Callback = function(v) Settings.Fly = v; if v then StartFly() else StopFly() end end})
+MoveSec:AddSlider({Name = "Fly Speed", Min = 20, Max = 150, Default = 55, Increment = 5, Flag = "flyspeed", Save = true, Callback = function(v) Settings.FlySpeed = v end})
+MoveSec:AddToggle({Name = T("noclip"), Default = false, Flag = "noclip", Save = true, Callback = function(v) Settings.Noclip = v; if v then StartNoclip() else StopNoclip() end end})
+MoveSec:AddToggle({Name = T("bhop"), Default = false, Flag = "bhop", Save = true, Callback = function(v) Settings.Bhop = v; if v then StartBhop() else StopBhop() end end})
+MoveSec:AddToggle({Name = T("antifling"), Default = false, Flag = "antifling", Save = true, Callback = function(v) Settings.AntiFling = v; if v then StartAntiFling() else StopAntiFling() end end})
 
-ActivateBtn.MouseEnter:Connect(function() Tween(ActivateBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(145, 80, 255)}) end)
-ActivateBtn.MouseLeave:Connect(function() Tween(ActivateBtn, 0.2, {BackgroundColor3 = COLORS.Accent}) end)
-GenBtn.MouseEnter:Connect(function() Tween(GenBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(20, 210, 140)}) end)
-GenBtn.MouseLeave:Connect(function() Tween(GenBtn, 0.2, {BackgroundColor3 = COLORS.Success}) end)
-CopyBtn.MouseEnter:Connect(function() Tween(CopyBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
-CopyBtn.MouseLeave:Connect(function() Tween(CopyBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)}) end)
-GetScriptBtn.MouseEnter:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
-GetScriptBtn.MouseLeave:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)}) end)
+-- COMBAT TAB
+local CombatSec = CombatTab:AddSection({Name = "Combat"})
+CombatSec:AddToggle({Name = T("aimbot"), Default = false, Flag = "aimbot", Save = true, Callback = function(v) Settings.Aimbot = v; if v then StartAimbot() else StopAimbot() end end})
+CombatSec:AddToggle({Name = T("killall"), Default = false, Flag = "killall", Save = true, Callback = function(v) Settings.KillAll = v; if v then StartKillAll() else StopKillAll() end end})
+CombatSec:AddSlider({Name = T("range"), Min = 5, Max = 50, Default = 15, Increment = 1, Flag = "killrange", Save = true, Callback = function(v) Settings.KillAuraRange = v end})
+CombatSec:AddToggle({Name = T("pickup"), Default = false, Flag = "pickup", Save = true, Callback = function(v) Settings.AutoPickup = v; if v then StartPickup() else StopPickup() end end})
+CombatSec:AddToggle({Name = T("reveal"), Default = false, Flag = "reveal", Save = true, Callback = function(v) Settings.RevealMurderer = v end})
 
-KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
-Tween(KeyFrame, 0.5, {Position = UDim2.new(0.5, -200, 0.5, -265)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
-local function CloseKeyGui()
-    Tween(KeyFrame, 0.3, {
-        Position = UDim2.new(0.5, -200, 0.5, -225),
-        BackgroundTransparency = 1
-    }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-    for _, obj in ipairs(KeyFrame:GetDescendants()) do
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-            Tween(obj, 0.3, {TextTransparency = 1})
-        elseif obj:IsA("Frame") and obj ~= KeyFrame then
-            Tween(obj, 0.3, {BackgroundTransparency = 1})
-        elseif obj:IsA("UIStroke") then
-            Tween(obj, 0.3, {Transparency = 1})
-        end
-    end
-    task.wait(0.4)
-    KeyGui:Destroy()
-    BuildUI()
-end
-
-ActivateBtn.MouseButton1Click:Connect(function()
-    if KeyBox.Text == "" then Notify(T("keyInput"), COLORS.Warning); return end
-    ActivateBtn.Text = T("checking")
-    ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-
-    local valid, info = ValidateKey(KeyBox.Text)
-    if valid then
-        IsAuthenticated = true
-        SaveKey(KeyBox.Text)
-        Notify(T("accessGranted"), COLORS.Success)
-        CloseKeyGui()
-    else
-        KeyBox.Text = ""
-        KeyBox.PlaceholderText = T("keyInvalid")
-        ActivateBtn.Text = T("activate")
-        ActivateBtn.BackgroundColor3 = COLORS.Accent
-        Notify(info or T("invalidKey"), COLORS.Danger)
-        local orig = KeyBox.Position
-        for i = 1, 4 do
-            Tween(KeyBox, 0.05, {Position = orig + UDim2.new(0, (i%2==0 and 6 or -6), 0, 0)})
-            task.wait(0.05)
-        end
-        Tween(KeyBox, 0.05, {Position = orig})
-    end
-end)
-
-GenBtn.MouseButton1Click:Connect(function()
-    GenBtn.Text = T("generating")
-    GenBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    GenBtn.Active = false
-
-    task.spawn(function()
-        local key, info = GenerateKeyRemote(selectedDuration)
-        if key then
-            KeyBox.Text = key
-            Notify(T("keyCreated"), COLORS.Success)
-            GenBtn.Text = T("done")
-            GenBtn.BackgroundColor3 = COLORS.Success
-        else
-            Notify(info or T("errorMsg"), COLORS.Danger)
-            GenBtn.Text = T("generate")
-            GenBtn.BackgroundColor3 = COLORS.Success
-            GenBtn.Active = true
-        end
-    end)
-end)
-
-CopyBtn.MouseButton1Click:Connect(function()
-    if KeyBox.Text == "" then Notify(T("noKey"), COLORS.Warning); return end
-    if setclipboard then
-        setclipboard(KeyBox.Text)
-        Notify(T("keyCopiedMsg"), COLORS.Success)
-        CopyBtn.Text = T("copied")
-        task.wait(1.2)
-        CopyBtn.Text = T("copyKey")
-    else
-        Notify(T("clipUnavailable"), COLORS.Danger)
-    end
-end)
-
-GetScriptBtn.MouseButton1Click:Connect(function()
-    if setclipboard then
-        setclipboard(SITE_URL)
-        Notify(T("linkCopiedMsg"), COLORS.Success)
-        GetScriptBtn.Text = T("linkCopied")
-        Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(16, 60, 40)})
-        task.wait(1.8)
-        GetScriptBtn.Text = T("getScript")
-        Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)})
-    else
-        Notify(T("clipUnavailable"), COLORS.Danger)
-    end
-end)
-
-keyLangBtn.MouseButton1Click:Connect(function()
-    Lang = (Lang == "ru") and "en" or "ru"
-    SaveLang(Lang)
-    PlayToggleSound()
-    keyLangBtn.Text = T("langBtn")
-    keyHeader.Text = T("menuTitle")
-    KeyBox.PlaceholderText = T("keyInput")
-    ActivateBtn.Text = T("activate")
-    genTitle.Text = T("genTitle")
-    GenBtn.Text = T("generate")
-    CopyBtn.Text = T("copyKey")
-    GetScriptBtn.Text = T("getScript")
-    if MainGui and MainGui.Parent then
-        pcall(function() MainGui:Destroy() end)
-        BuildUI()
-    end
-end)
-
+local FlingSec = CombatTab:AddSection({Name = "FLING"})
+local flingDropdown = FlingSec:AddDropdown({
+    Name = T("flingTarget"), Default = "None",
+    Options = {"None"},
+    Flag = "flingtarget", Save = false,
+    Callback = function(v) end
+})
 task.spawn(function()
-    task.wait(1.5)
-    local savedKey = LoadKey()
-    if not savedKey then return end
-    KeyBox.Text = savedKey
-    ActivateBtn.Text = T("autologin")
-    ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    local valid, info = ValidateKey(savedKey)
-    if valid then
-        IsAuthenticated = true
-        Notify(T("autologinOk"), COLORS.Success)
-        CloseKeyGui()
-    else
-        ClearKey()
-        KeyBox.Text = ""
-        KeyBox.PlaceholderText = T("keyExpired")
-        ActivateBtn.Text = T("activate")
-        ActivateBtn.BackgroundColor3 = COLORS.Accent
-        Notify(T("sessionExpired"), COLORS.Warning)
+    while task.wait(3) do
+        local opts = {"None"}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then table.insert(opts, p.DisplayName) end
+        end
+        pcall(function() flingDropdown:Refresh(opts, flingDropdown.Value or "None") end)
     end
 end)
 
---==================================================
--- MAIN UI
---==================================================
-local MainGui, MainFrame
+FlingSec:AddButton({
+    Name = "FLING SELECTED",
+    Callback = function()
+        local name = flingDropdown.Value
+        if name == "None" then Notify("FLING", "Выбери игрока", 2); return end
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.DisplayName == name then FlingPlayer(p); break end
+        end
+    end
+})
 
-function BuildUI()
-    if MainGui then pcall(function() MainGui:Destroy() end) end
-    MainGui = Instance.new("ScreenGui")
-    MainGui.Name = "Fondi_V7"
-    MainGui.ResetOnSpawn = false
-    MainGui.IgnoreGuiInset = true
-    MainGui.Parent = pg
+FlingSec:AddButton({
+    Name = T("flingAll"),
+    Callback = function()
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then FlingPlayer(p) end
+        end
+    end
+})
 
-    MainFrame = Instance.new("Frame", MainGui)
-    MainFrame.Size = UDim2.new(0, 380, 0, 600)
-    MainFrame.Position = UDim2.new(0.5, -190, 0.5, -300)
-    MainFrame.BackgroundColor3 = COLORS.Card
-    MainFrame.BackgroundTransparency = 0.03
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Active = true
-    MainFrame.Draggable = true
-    Corner(MainFrame, 18)
-    Stroke(MainFrame, COLORS.Accent, 1.5)
+-- FARM TAB
+local FarmSec = FarmTab:AddSection({Name = "Coins"})
+FarmSec:AddToggle({Name = T("farm"), Default = false, Flag = "farm", Save = true, Callback = function(v) Settings.Farm = v; if v then StartFarm() else StopFarm() end end})
 
-    local header = Instance.new("Frame", MainFrame)
-    header.Size = UDim2.new(1, 0, 0, 65)
-    header.BackgroundColor3 = Color3.fromRGB(20, 20, 32)
-    header.BackgroundTransparency = 0.3
-    header.BorderSizePixel = 0
-    Corner(header, 18)
+-- MISC TAB
+local MiscSec = MiscTab:AddSection({Name = "Notifications"})
+MiscSec:AddToggle({Name = T("notif"), Default = true, Flag = "notif", Save = true, Callback = function(v) Settings.Notifications = v end})
 
-    local ht = Instance.new("TextLabel", header)
-    ht.Size = UDim2.new(1, -120, 0, 30)
-    ht.Position = UDim2.new(0, 20, 0, 8)
-    ht.BackgroundTransparency = 1
-    ht.Text = T("menuTitle")
-    ht.TextColor3 = COLORS.Text
-    ht.Font = Enum.Font.GothamBold
-    ht.TextSize = 20
-    ht.TextXAlignment = Enum.TextXAlignment.Left
-
-    local hs = Instance.new("TextLabel", header)
-    hs.Size = UDim2.new(1, -120, 0, 18)
-    hs.Position = UDim2.new(0, 20, 0, 36)
-    hs.BackgroundTransparency = 1
-    hs.Text = "V7.0 • " .. (LP.DisplayName or "User")
-    hs.TextColor3 = COLORS.Accent2
-    hs.Font = Enum.Font.Gotham
-    hs.TextSize = 11
-    hs.TextXAlignment = Enum.TextXAlignment.Left
-
-    local langBtn = Instance.new("TextButton", header)
-    langBtn.Size = UDim2.new(0, 40, 0, 30)
-    langBtn.Position = UDim2.new(1, -80, 0, 17)
-    langBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
-    langBtn.Text = T("langBtn")
-    langBtn.TextColor3 = COLORS.Accent2
-    langBtn.Font = Enum.Font.GothamBold
-    langBtn.TextSize = 12
-    langBtn.BorderSizePixel = 0
-    langBtn.AutoButtonColor = false
-    Corner(langBtn, 8)
-    Stroke(langBtn, COLORS.Accent2, 1)
-
-    langBtn.MouseEnter:Connect(function() Tween(langBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
-    langBtn.MouseLeave:Connect(function() Tween(langBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)}) end)
-
-    langBtn.MouseButton1Click:Connect(function()
+-- SETTINGS TAB
+local SettingsSec = SettingsTab:AddSection({Name = "Language"})
+SettingsSec:AddButton({
+    Name = "Switch Language / Сменить язык",
+    Callback = function()
         Lang = (Lang == "ru") and "en" or "ru"
         SaveLang(Lang)
-        PlayToggleSound()
-        if MainGui then pcall(function() MainGui:Destroy() end) end
-        BuildUI()
-    end)
-
-    local close = Instance.new("TextButton", header)
-    close.Size = UDim2.new(0, 30, 0, 30)
-    close.Position = UDim2.new(1, -36, 0, 17)
-    close.BackgroundColor3 = Color3.fromRGB(45, 20, 25)
-    close.Text = "✕"
-    close.TextColor3 = COLORS.Danger
-    close.Font = Enum.Font.GothamBold
-    close.TextSize = 14
-    close.BorderSizePixel = 0
-    Corner(close, 8)
-    close.MouseButton1Click:Connect(function()
-        Tween(MainFrame, 0.25, {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0)}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        task.wait(0.25)
-        MainFrame.Visible = false
-        MainFrame.Size = UDim2.new(0, 380, 0, 600)
-        MainFrame.Position = UDim2.new(0.5, -190, 0.5, -300)
-    end)
-
-    local scroll = Instance.new("ScrollingFrame", MainFrame)
-    scroll.Size = UDim2.new(1, -20, 1, -85)
-    scroll.Position = UDim2.new(0, 10, 0, 75)
-    scroll.BackgroundTransparency = 1
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 3
-    scroll.ScrollBarImageColor3 = COLORS.Accent
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    local layout = Instance.new("UIListLayout", scroll)
-    layout.Padding = UDim.new(0, 8)
-
-    local function CreateToggle(name, setting, color, callback)
-        color = color or COLORS.Accent
-
-        local btn = Instance.new("TextButton", scroll)
-        btn.Size = UDim2.new(1, -5, 0, 46)
-        btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(28, 28, 44) or Color3.fromRGB(20, 20, 30)
-        btn.Text = ""
-        btn.BorderSizePixel = 0
-        btn.AutoButtonColor = false
-        Corner(btn, 10)
-        local bs = Stroke(btn, Settings[setting] and color or Color3.fromRGB(45, 45, 65), 1.5)
-
-        local lbl = Instance.new("TextLabel", btn)
-        lbl.Size = UDim2.new(1, -100, 1, 0)
-        lbl.Position = UDim2.new(0, 16, 0, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = name
-        lbl.TextColor3 = Settings[setting] and color or COLORS.Text
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextSize = 13
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-
-        local pill = Instance.new("Frame", btn)
-        pill.Size = UDim2.new(0, 40, 0, 22)
-        pill.Position = UDim2.new(1, -54, 0.5, -11)
-        pill.BackgroundColor3 = Settings[setting] and color or Color3.fromRGB(50, 50, 70)
-        pill.BorderSizePixel = 0
-        Corner(pill, 11)
-
-        local knob = Instance.new("Frame", pill)
-        knob.Size = UDim2.new(0, 16, 0, 16)
-        knob.Position = Settings[setting] and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-        knob.BackgroundColor3 = Color3.new(1,1,1)
-        knob.BorderSizePixel = 0
-        Corner(knob, 8)
-
-        btn.MouseEnter:Connect(function()
-            Tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(30, 30, 45)})
-        end)
-        btn.MouseLeave:Connect(function()
-            if not Settings[setting] then
-                Tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(20, 20, 30)})
-            end
-        end)
-
-        btn.MouseButton1Click:Connect(function()
-            Settings[setting] = not Settings[setting]
-            local on = Settings[setting]
-
-            Tween(btn, 0.2, {BackgroundColor3 = on and Color3.fromRGB(28, 28, 44) or Color3.fromRGB(20, 20, 30)})
-            Tween(bs, 0.2, {Color = on and color or Color3.fromRGB(45, 45, 65)})
-            Tween(lbl, 0.2, {TextColor3 = on and color or COLORS.Text})
-            Tween(pill, 0.2, {BackgroundColor3 = on and color or Color3.fromRGB(50, 50, 70)})
-            Tween(knob, 0.25, {
-                Position = on and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-            }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
-            PlayToggleSound()
-            Notify(name .. ": " .. (on and T("on") or T("off")), on and COLORS.Success or COLORS.Danger)
-
-            if callback then callback(on) end
-        end)
+        Notify("LANG", "Changed to " .. Lang, 2)
+        task.wait(0.5)
+        Window:Destroy()
+        -- перезапуск всего скрипта — просто вызовем loadstring заново
+        local src = game:HttpGet("https://raw.githubusercontent.com/p1shenak/main.lua/refs/heads/main/main.lua")
+        loadstring(src)()
     end
+})
 
-    -- ESP
-    CreateToggle(T("esp"), "ESP", COLORS.Accent, function(on)
-        if on then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP then CreateESP(p) end
-            end
-        else
-            for p, _ in pairs(ESPObjects) do RemoveESP(p) end
-        end
-    end)
-    CreateToggle(T("outline"), "Outline", COLORS.Accent2)
-    CreateToggle(T("tracers"), "Tracers", Color3.fromRGB(255, 100, 200))
-    CreateToggle(T("names"), "ShowNames", Color3.fromRGB(150, 200, 255))
-    CreateToggle(T("roles"), "ShowRoles", Color3.fromRGB(200, 150, 255))
-
-    -- Movement
-    CreateToggle(T("fly"), "Fly", Color3.fromRGB(0, 200, 255), function(on)
-        if on then StartFly() else StopFly() end
-    end)
-    CreateToggle(T("noclip"), "Noclip", Color3.fromRGB(100, 255, 100), function(on)
-        if on then StartNoclip() else StopNoclip() end
-    end)
-    CreateToggle(T("bhop"), "Bhop", Color3.fromRGB(150, 200, 100), function(on)
-        if on then StartBhop() else StopBhop() end
-    end)
-    CreateToggle(T("antiFling"), "AntiFling", Color3.fromRGB(255, 150, 50), function(on)
-        if on then StartAntiFling() else StopAntiFling() end
-    end)
-
-    -- Kill Aura
-    CreateToggle(T("killAura"), "KillAura", Color3.fromRGB(255, 50, 100), function(on)
-        if on then StartKillAura() else StopKillAura() end
-    end)
-
-    -- Ползунок дистанции Kill Aura
-    local sliderFrame = Instance.new("Frame", scroll)
-    sliderFrame.Size = UDim2.new(1, -5, 0, 40)
-    sliderFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    sliderFrame.BorderSizePixel = 0
-    Corner(sliderFrame, 10)
-    Stroke(sliderFrame, Color3.fromRGB(45, 45, 65), 1.5)
-
-    local sliderLabel = Instance.new("TextLabel", sliderFrame)
-    sliderLabel.Size = UDim2.new(0, 100, 1, 0)
-    sliderLabel.Position = UDim2.new(0, 16, 0, 0)
-    sliderLabel.BackgroundTransparency = 1
-    sliderLabel.Text = T("killAuraRange") .. Settings.KillAuraRange
-    sliderLabel.TextColor3 = COLORS.Text
-    sliderLabel.Font = Enum.Font.GothamBold
-    sliderLabel.TextSize = 12
-    sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-    local sliderBar = Instance.new("Frame", sliderFrame)
-    sliderBar.Size = UDim2.new(0, 180, 0, 6)
-    sliderBar.Position = UDim2.new(1, -200, 0.5, -3)
-    sliderBar.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-    sliderBar.BorderSizePixel = 0
-    Corner(sliderBar, 3)
-
-    local sliderFill = Instance.new("Frame", sliderBar)
-    sliderFill.Size = UDim2.new((Settings.KillAuraRange - 5) / 45, 0, 1, 0)
-    sliderFill.BackgroundColor3 = Color3.fromRGB(255, 50, 100)
-    sliderFill.BorderSizePixel = 0
-    Corner(sliderFill, 3)
-
-    local sliderKnob = Instance.new("Frame", sliderBar)
-    sliderKnob.Size = UDim2.new(0, 14, 0, 14)
-    sliderKnob.Position = UDim2.new((Settings.KillAuraRange - 5) / 45, -7, 0.5, -7)
-    sliderKnob.BackgroundColor3 = Color3.new(1, 1, 1)
-    sliderKnob.BorderSizePixel = 0
-    Corner(sliderKnob, 7)
-
-    local dragging = false
-    sliderBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-        end
-    end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local rel = (input.Position.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X
-            rel = math.clamp(rel, 0, 1)
-            Settings.KillAuraRange = math.floor(5 + rel * 45)
-            sliderLabel.Text = T("killAuraRange") .. Settings.KillAuraRange
-            sliderFill.Size = UDim2.new(rel, 0, 1, 0)
-            sliderKnob.Position = UDim2.new(rel, -7, 0.5, -7)
-        end
-    end)
-    UIS.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-
-    -- Farm
-    CreateToggle(T("farm"), "Farm", Color3.fromRGB(255, 200, 50), function(on)
-        if on then StartFarm() else StopFarm() end
-    end)
-
-    -- Notifications
-    CreateToggle(T("notifications"), "Notifications", Color3.fromRGB(100, 200, 255))
-
-    -- Spectator
-    local specBtn = Instance.new("TextButton", scroll)
-    specBtn.Size = UDim2.new(1, -5, 0, 46)
-    specBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    specBtn.Text = T("spectator")
-    specBtn.TextColor3 = COLORS.Text
-    specBtn.Font = Enum.Font.GothamBold
-    specBtn.TextSize = 13
-    specBtn.BorderSizePixel = 0
-    specBtn.AutoButtonColor = false
-    Corner(specBtn, 10)
-    Stroke(specBtn, Color3.fromRGB(45, 45, 65), 1.5)
-
-    specBtn.MouseButton1Click:Connect(function()
-        Settings.Spectator = not Settings.Spectator
-        local cam = workspace.CurrentCamera
-        if not Settings.Spectator then
-            cam.CameraSubject = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
-            specBtn.Text = T("spectator")
-            specBtn.TextColor3 = COLORS.Text
-            Tween(specBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(20, 20, 30)})
-            return
-        end
-        local list = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LP and p.Character and p.Character:FindFirstChildOfClass("Humanoid") then
-                table.insert(list, p)
-            end
-        end
-        if #list == 0 then
-            Settings.Spectator = false
-            Notify(T("noPlayers"), COLORS.Danger)
-            return
-        end
-        local t = list[1]
-        cam.CameraSubject = t.Character:FindFirstChildOfClass("Humanoid")
-        specBtn.Text = T("spectator") .. ": " .. t.DisplayName
-        specBtn.TextColor3 = COLORS.Accent2
-        Tween(specBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 44)})
-    end)
-
-    -- Player list
-    local listTitle = Instance.new("TextLabel", scroll)
-    listTitle.Size = UDim2.new(1, -5, 0, 26)
-    listTitle.BackgroundTransparency = 1
-    listTitle.Text = T("playerList")
-    listTitle.TextColor3 = COLORS.SubText
-    listTitle.Font = Enum.Font.GothamBold
-    listTitle.TextSize = 11
-    listTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-    local playerList = Instance.new("Frame", scroll)
-    playerList.Size = UDim2.new(1, -5, 0, 0)
-    playerList.AutomaticSize = Enum.AutomaticSize.Y
-    playerList.BackgroundColor3 = Color3.fromRGB(15, 15, 24)
-    playerList.BorderSizePixel = 0
-    Corner(playerList, 10)
-    Stroke(playerList, Color3.fromRGB(45, 45, 65), 1)
-    local ll = Instance.new("UIListLayout", playerList)
-    ll.Padding = UDim.new(0, 2)
-    local lp2 = Instance.new("UIPadding", playerList)
-    lp2.PaddingTop = UDim.new(0, 6)
-    lp2.PaddingBottom = UDim.new(0, 6)
-
-    local function RefreshList()
-        for _, c in ipairs(playerList:GetChildren()) do
-            if c:IsA("TextLabel") then c:Destroy() end
-        end
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LP then
-                local role = GetRole(p)
-                local row = Instance.new("TextLabel", playerList)
-                row.Size = UDim2.new(1, -10, 0, 22)
-                row.Position = UDim2.new(0, 5, 0, 0)
-                row.BackgroundTransparency = 1
-                row.Text = p.DisplayName .. "  ·  " .. role
-                row.TextColor3 = GetRoleColor(role)
-                row.Font = Enum.Font.Gotham
-                row.TextSize = 11
-                row.TextXAlignment = Enum.TextXAlignment.Left
-            end
-        end
+SettingsSec:AddButton({
+    Name = "Reset Key (Выйти из сессии)",
+    Callback = function()
+        ClearKey()
+        Notify("SESSION", "Ключ удалён, перезапусти скрипт", 3)
     end
-    RefreshList()
+})
 
-    task.spawn(function()
-        while MainGui and MainGui.Parent do
-            task.wait(1)
-            if playerList and playerList.Parent then RefreshList() end
-        end
-    end)
-
-    MainFrame.Size = UDim2.new(0, 0, 0, 0)
-    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Tween(MainFrame, 0.4, {
-        Size = UDim2.new(0, 380, 0, 600),
-        Position = UDim2.new(0.5, -190, 0.5, -300)
-    }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-end
+OrionLib:Init()
 
 --==================================================
 -- HOTKEYS
 --==================================================
-local function ToggleMenu()
-    if not MainGui or not MainGui.Parent then return end
-    if not MainFrame.Visible then
-        MainFrame.Visible = true
-        MainFrame.Size = UDim2.new(0, 0, 0, 0)
-        MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-        Tween(MainFrame, 0.3, {
-            Size = UDim2.new(0, 380, 0, 600),
-            Position = UDim2.new(0.5, -190, 0.5, -300)
-        }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    else
-        Tween(MainFrame, 0.25, {
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0)
-        }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        task.wait(0.25)
-        MainFrame.Visible = false
-        MainFrame.Size = UDim2.new(0, 380, 0, 600)
-        MainFrame.Position = UDim2.new(0.5, -190, 0.5, -300)
-    end
-end
-
 UIS.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if not IsAuthenticated then return end
-    if input.KeyCode == Enum.KeyCode.L then
-        ToggleMenu()
-    elseif input.KeyCode == Enum.KeyCode.F then
+    if gp or not IsAuthenticated then return end
+    if input.KeyCode == Enum.KeyCode.F then
         Settings.Fly = not Settings.Fly
         if Settings.Fly then StartFly() else StopFly() end
-        Notify(Settings.Fly and T("flightOn") or T("flightOff"), Settings.Fly and COLORS.Success or COLORS.Danger)
+        Notify("FLY", Settings.Fly and T("on") or T("off"), 1.5)
     elseif input.KeyCode == Enum.KeyCode.N then
         Settings.Noclip = not Settings.Noclip
         if Settings.Noclip then StartNoclip() else StopNoclip() end
-        Notify(Settings.Noclip and T("noclipOn") or T("noclipOff"), Settings.Noclip and COLORS.Success or COLORS.Danger)
-    elseif input.KeyCode == Enum.KeyCode.B then
-        Settings.Bhop = not Settings.Bhop
-        if Settings.Bhop then StartBhop() else StopBhop() end
-        Notify(Settings.Bhop and T("bhopOn") or T("bhopOff"), Settings.Bhop and COLORS.Success or COLORS.Danger)
-    elseif input.KeyCode == Enum.KeyCode.K then
-        Settings.KillAura = not Settings.KillAura
-        if Settings.KillAura then StartKillAura() else StopKillAura() end
-        Notify(Settings.KillAura and T("killAuraOn") or T("killAuraOff"), Settings.KillAura and COLORS.Success or COLORS.Danger)
-    elseif input.KeyCode == Enum.KeyCode.G then
-        Settings.Farm = not Settings.Farm
-        if Settings.Farm then StartFarm() else StopFarm() end
-        Notify(Settings.Farm and T("farmOn") or T("farmOff"), Settings.Farm and COLORS.Success or COLORS.Danger)
+        Notify("NOCLIP", Settings.Noclip and T("on") or T("off"), 1.5)
     end
 end)
 
-do
-    local saved = LoadLang()
-    if saved then Lang = saved end
-end
+--==================================================
+-- AUTOLOGIN
+--==================================================
+task.spawn(function()
+    task.wait(1.5)
+    local saved = LoadKey()
+    if saved then
+        local valid = ValidateKey(saved)
+        if valid then
+            IsAuthenticated = true
+            Notify(T("accessOk"), "FONDI MM2", 2)
+            return
+        end
+        ClearKey()
+    end
+
+    -- Если нет ключа — показываем окно ввода через Orion (или можно обычным GUI)
+    -- Поскольку Orion не умеет в prompt, используем простой GUI
+    local sg = Instance.new("ScreenGui", pg)
+    sg.Name = "FondiKeyPrompt"
+    sg.ResetOnSpawn = false
+
+    local frame = Instance.new("Frame", sg)
+    frame.Size = UDim2.new(0, 400, 0, 260)
+    frame.Position = UDim2.new(0.5, -200, 0.5, -130)
+    frame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
+
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = Color3.fromRGB(124, 58, 237)
+    stroke.Thickness = 1.5
+
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Position = UDim2.new(0, 0, 0, 15)
+    title.BackgroundTransparency = 1
+    title.Text = T("menu")
+    title.TextColor3 = Color3.new(1,1,1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 22
+
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.new(0.85, 0, 0, 44)
+    box.Position = UDim2.new(0.075, 0, 0, 70)
+    box.PlaceholderText = T("keyInput")
+    box.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
+    box.TextColor3 = Color3.new(1,1,1)
+    box.Font = Enum.Font.Code
+    box.TextSize = 14
+    box.ClearTextOnFocus = false
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 10)
+
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0.85, 0, 0, 44)
+    btn.Position = UDim2.new(0.075, 0, 0, 130)
+    btn.Text = T("activate")
+    btn.BackgroundColor3 = Color3.fromRGB(124, 58, 237)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+
+    local genBtn = Instance.new("TextButton", frame)
+    genBtn.Size = UDim2.new(0.85, 0, 0, 36)
+    genBtn.Position = UDim2.new(0.075, 0, 0, 185)
+    genBtn.Text = T("genKey")
+    genBtn.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+    genBtn.TextColor3 = Color3.new(1,1,1)
+    genBtn.Font = Enum.Font.GothamBold
+    genBtn.TextSize = 13
+    Instance.new("UICorner", genBtn).CornerRadius = UDim.new(0, 10)
+
+    btn.MouseButton1Click:Connect(function()
+        if box.Text == "" then return end
+        btn.Text = T("checking")
+        local valid = ValidateKey(box.Text)
+        if valid then
+            IsAuthenticated = true
+            SaveKey(box.Text)
+            sg:Destroy()
+            Notify(T("accessOk"), "FONDI MM2", 2)
+        else
+            box.Text = ""
+            box.PlaceholderText = T("keyInvalid")
+            btn.Text = T("activate")
+        end
+    end)
+
+    genBtn.MouseButton1Click:Connect(function()
+        genBtn.Text = "..."
+        task.spawn(function()
+            local key = GenerateKeyRemote("1d")
+            if key then box.Text = key; Notify("KEY", T("genTitle"), 2) end
+            genBtn.Text = T("genKey")
+        end)
+    end)
+end)
 
 print("==========================================")
-print("[FONDI MM2 V7.0] EXTENDED READY")
+print("[FONDI MM2 V8.0] ORION UI READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
