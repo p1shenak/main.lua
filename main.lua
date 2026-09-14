@@ -1,10 +1,10 @@
 --[[
-    FONDI MM2 V10.0 // NEON UI EDITION
+    FONDI MM2 V10.1 // NEON UI (ZIndex FIXED)
     - Красивое меню с анимациями запуска
     - Плавные переходы между вкладками
     - Particle burst при клике
     - Loading screen
-    - Все функции: ESP / Fly / Noclip / Bhop / Anti-Fling / Aimbot / Kill All / Farm / Fling / Reveal / Anti-Kick
+    - ESP / Fly / Noclip / Bhop / Anti-Fling / Aimbot / Kill All / Farm / Fling / Reveal / Anti-Kick
     - RU/EN
 ]]
 
@@ -33,9 +33,6 @@ local Settings = {
     KillAll=false, KillAuraRange=15, Farm=false, Notifications=true
 }
 
---==================================================
--- COLORS
---==================================================
 local C = {
     Murderer = Color3.fromRGB(255, 60, 60),
     Sheriff  = Color3.fromRGB(60, 140, 255),
@@ -58,9 +55,6 @@ local C = {
     Purple2  = Color3.fromRGB(168, 85, 247)
 }
 
---==================================================
--- I18N
---==================================================
 local I18N = {
     ru = {
         menu="FONDI MM2", esp="ESP", outline="Контур", tracers="Трассеры",
@@ -129,9 +123,6 @@ local I18N = {
 }
 local function T(k) return (I18N[Lang] and I18N[Lang][k]) or k end
 
---==================================================
--- HELPERS
---==================================================
 local function Corner(p, r)
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, r or 8)
@@ -153,9 +144,6 @@ local function Tween(o, t, props, style, dir)
     return tw
 end
 
---==================================================
--- HTTP / AUTH
---==================================================
 local function HttpPost(url, body)
     local json = HttpService:JSONEncode(body)
     local ok, result = pcall(function()
@@ -210,9 +198,6 @@ local function LoadLang()
     if ok and (c == "ru" or c == "en") then return c end
 end
 
---==================================================
--- NOTIFY (new design)
---==================================================
 local function Notify(text, color, duration)
     duration = duration or 3
     local sg = pg:FindFirstChild("Fondi_Notify")
@@ -222,6 +207,7 @@ local function Notify(text, color, duration)
         sg.ResetOnSpawn = false
         sg.IgnoreGuiInset = true
         sg.DisplayOrder = 999
+        sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         sg.Parent = pg
     end
     color = color or C.Accent
@@ -236,7 +222,6 @@ local function Notify(text, color, duration)
     Corner(frame, 12)
     local st = Stroke(frame, color, 1.5)
 
-    -- Glow
     local glow = Instance.new("Frame", frame)
     glow.Size = UDim2.new(1, 8, 1, 8)
     glow.Position = UDim2.new(0, -4, 0, -4)
@@ -281,9 +266,6 @@ local function Notify(text, color, duration)
     end)
 end
 
---==================================================
--- PARTICLE BURST
---==================================================
 local function BurstFrom(el)
     local sg = pg:FindFirstChild("Fondi_Burst")
     if not sg then
@@ -292,6 +274,7 @@ local function BurstFrom(el)
         sg.ResetOnSpawn = false
         sg.IgnoreGuiInset = true
         sg.DisplayOrder = 1000
+        sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         sg.Parent = pg
     end
 
@@ -323,9 +306,6 @@ local function BurstFrom(el)
     end
 end
 
---==================================================
--- SOUND
---==================================================
 local ToggleSound = Instance.new("Sound")
 ToggleSound.SoundId = "rbxassetid://133095302935970"
 ToggleSound.Volume = 0.4
@@ -339,9 +319,6 @@ local function PlayClick()
     end)
 end
 
---==================================================
--- ROLE
---==================================================
 local function GetRole(player)
     if not player then return "Innocent" end
     local char = player.Character
@@ -353,9 +330,6 @@ local function GetRole(player)
 end
 local function RoleColor(r) return C[r] or C.Innocent end
 
---==================================================
--- ESP
---==================================================
 local ESPObjects, PlayerConnections = {}, {}
 local lastRoles = {}
 
@@ -535,9 +509,6 @@ task.spawn(function()
     end
 end)
 
---==================================================
--- NOCLIP
---==================================================
 local noclipConnection = nil
 local function StopNoclip()
     if noclipConnection then noclipConnection:Disconnect(); noclipConnection = nil end
@@ -558,9 +529,6 @@ local function StartNoclip()
     end)
 end
 
---==================================================
--- FLY
---==================================================
 local flyConnection, flyActive = nil, false
 local function StopFly()
     flyActive = false
@@ -599,9 +567,6 @@ local function StartFly()
     end)
 end
 
---==================================================
--- BHOP
---==================================================
 local bhopConnection = nil
 local function StopBhop()
     if bhopConnection then bhopConnection:Disconnect(); bhopConnection = nil end
@@ -622,9 +587,6 @@ local function StartBhop()
     end)
 end
 
---==================================================
--- ANTI-FLING
---==================================================
 local afConnection = nil
 local function StopAntiFling()
     if afConnection then afConnection:Disconnect(); afConnection = nil end
@@ -644,9 +606,6 @@ local function StartAntiFling()
     end)
 end
 
---==================================================
--- AIMBOT
---==================================================
 local aimbotConnection = nil
 local function StopAimbot()
     if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
@@ -677,9 +636,6 @@ local function StartAimbot()
     end)
 end
 
---==================================================
--- PICKUP
---==================================================
 local pickupConnection = nil
 local function StopPickup()
     if pickupConnection then pickupConnection:Disconnect(); pickupConnection = nil end
@@ -702,9 +658,6 @@ local function StartPickup()
     end)
 end
 
---==================================================
--- KILL ALL
---==================================================
 local killAllConnection = nil
 local function GetWeapon()
     local c = LP.Character
@@ -737,9 +690,6 @@ local function StartKillAll()
     end)
 end
 
---==================================================
--- FLING
---==================================================
 local function FlingPlayer(target)
     if not target or not target.Character then return end
     local tr = target.Character:FindFirstChild("HumanoidRootPart")
@@ -751,9 +701,6 @@ local function FlingPlayer(target)
     Notify("FLING → " .. target.DisplayName, C.Pink, 2)
 end
 
---==================================================
--- FARM
---==================================================
 local farmConnection = nil
 local function StopFarm()
     if farmConnection then farmConnection:Disconnect(); farmConnection = nil end
@@ -777,9 +724,6 @@ local function StartFarm()
     end)
 end
 
---==================================================
--- ANTI-KICK
---==================================================
 pcall(function()
     local oldKick = hookfunction or hookfunc
     if oldKick and LP.Kick then
@@ -791,15 +735,13 @@ pcall(function()
     end
 end)
 
---==================================================
--- LOADING SCREEN
---==================================================
 local function ShowLoadingScreen(callback)
     local loadingGui = Instance.new("ScreenGui")
     loadingGui.Name = "FondiLoading"
     loadingGui.ResetOnSpawn = false
     loadingGui.IgnoreGuiInset = true
     loadingGui.DisplayOrder = 9999
+    loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     loadingGui.Parent = pg
 
     local bg = Instance.new("Frame", loadingGui)
@@ -807,13 +749,13 @@ local function ShowLoadingScreen(callback)
     bg.BackgroundColor3 = C.Bg
     bg.BorderSizePixel = 0
 
-    -- Glow circles
     local g1 = Instance.new("Frame", bg)
     g1.Size = UDim2.new(0, 500, 0, 500)
     g1.Position = UDim2.new(0.5, -250, 0.5, -250)
     g1.BackgroundColor3 = C.Accent
     g1.BackgroundTransparency = 0.7
     g1.BorderSizePixel = 0
+    g1.ZIndex = 0
     Corner(g1, 250)
     Tween(g1, 3, {Size = UDim2.new(0, 700, 0, 700), Position = UDim2.new(0.5, -350, 0.5, -350)}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 
@@ -823,13 +765,14 @@ local function ShowLoadingScreen(callback)
     g2.BackgroundColor3 = C.Accent2
     g2.BackgroundTransparency = 0.75
     g2.BorderSizePixel = 0
+    g2.ZIndex = 0
     Corner(g2, 150)
 
-    -- Logo
     local logo = Instance.new("TextLabel", bg)
     logo.Size = UDim2.new(1, 0, 0, 60)
     logo.Position = UDim2.new(0, 0, 0.4, -60)
     logo.BackgroundTransparency = 1
+    logo.ZIndex = 5
     logo.Text = "FONDI"
     logo.TextColor3 = C.Text
     logo.Font = Enum.Font.GothamBold
@@ -840,19 +783,20 @@ local function ShowLoadingScreen(callback)
     logo2.Size = UDim2.new(1, 0, 0, 40)
     logo2.Position = UDim2.new(0, 0, 0.4, -5)
     logo2.BackgroundTransparency = 1
-    logo2.Text = "MM2 V10.0"
+    logo2.ZIndex = 5
+    logo2.Text = "MM2 V10.1"
     logo2.TextColor3 = C.Accent2
     logo2.Font = Enum.Font.GothamBold
     logo2.TextSize = 16
     logo2.TextTransparency = 1
 
-    -- Progress bar
     local barBg = Instance.new("Frame", bg)
     barBg.Size = UDim2.new(0, 400, 0, 4)
     barBg.Position = UDim2.new(0.5, -200, 0.6, 0)
     barBg.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     barBg.BorderSizePixel = 0
     barBg.BackgroundTransparency = 1
+    barBg.ZIndex = 5
     Corner(barBg, 2)
 
     local barFill = Instance.new("Frame", barBg)
@@ -865,19 +809,18 @@ local function ShowLoadingScreen(callback)
     statusText.Size = UDim2.new(1, 0, 0, 20)
     statusText.Position = UDim2.new(0, 0, 0.6, 15)
     statusText.BackgroundTransparency = 1
+    statusText.ZIndex = 5
     statusText.Text = T("loading") .. "..."
     statusText.TextColor3 = C.SubText
     statusText.Font = Enum.Font.GothamBold
     statusText.TextSize = 11
     statusText.TextTransparency = 1
 
-    -- Animate logo in
     Tween(logo, 0.6, {TextTransparency = 0}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     Tween(logo2, 0.6, {TextTransparency = 0}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     Tween(barBg, 0.5, {BackgroundTransparency = 0}, nil, nil, 0.5)
     Tween(statusText, 0.6, {TextTransparency = 0})
 
-    -- Progress animation
     task.spawn(function()
         local stages = {
             {T("loading") .. " UI...", 25},
@@ -892,7 +835,6 @@ local function ShowLoadingScreen(callback)
         end
         task.wait(0.3)
 
-        -- Fade out
         Tween(bg, 0.4, {BackgroundTransparency = 1})
         Tween(logo, 0.4, {TextTransparency = 1})
         Tween(logo2, 0.4, {TextTransparency = 1})
@@ -908,9 +850,6 @@ local function ShowLoadingScreen(callback)
     end)
 end
 
---==================================================
--- BUILD MAIN UI
---==================================================
 local MainGui, MainFrame
 
 function BuildUI()
@@ -919,19 +858,19 @@ function BuildUI()
     MainGui.Name = "Fondi_V10"
     MainGui.ResetOnSpawn = false
     MainGui.IgnoreGuiInset = true
+    MainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     MainGui.Parent = pg
 
-    -- Background glow
     local bgGlow = Instance.new("Frame", MainGui)
     bgGlow.Size = UDim2.new(0, 500, 0, 500)
     bgGlow.Position = UDim2.new(0.5, -250, 0.5, -250)
     bgGlow.BackgroundColor3 = C.Accent
-    bgGlow.BackgroundTransparency = 0.92
+    bgGlow.BackgroundTransparency = 0.96
     bgGlow.BorderSizePixel = 0
+    bgGlow.ZIndex = 0
     Corner(bgGlow, 250)
     Tween(bgGlow, 4, {Size = UDim2.new(0, 700, 0, 700), Position = UDim2.new(0.5, -350, 0.5, -350)}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 
-    -- Main frame
     MainFrame = Instance.new("Frame", MainGui)
     MainFrame.Size = UDim2.new(0, 480, 0, 580)
     MainFrame.Position = UDim2.new(0.5, -240, 0.5, -290)
@@ -940,28 +879,27 @@ function BuildUI()
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Draggable = true
+    MainFrame.ZIndex = 10
     Corner(MainFrame, 20)
 
     local mainStroke = Stroke(MainFrame, C.Accent, 1.5)
     mainStroke.Transparency = 0
 
-    -- Outer glow
     local outerGlow = Instance.new("Frame", MainFrame)
     outerGlow.Size = UDim2.new(1, 12, 1, 12)
     outerGlow.Position = UDim2.new(0, -6, 0, -6)
     outerGlow.BackgroundColor3 = C.Accent
-    outerGlow.BackgroundTransparency = 0.9
+    outerGlow.BackgroundTransparency = 0.94
     outerGlow.BorderSizePixel = 0
     outerGlow.ZIndex = 0
     Corner(outerGlow, 24)
-    MainFrame.ZIndex = 2
 
-    -- Header
     local header = Instance.new("Frame", MainFrame)
     header.Size = UDim2.new(1, 0, 0, 70)
     header.BackgroundColor3 = Color3.fromRGB(22, 22, 34)
     header.BackgroundTransparency = 0.2
     header.BorderSizePixel = 0
+    header.ZIndex = 11
     Corner(header, 20)
 
     local headerLine = Instance.new("Frame", header)
@@ -970,11 +908,13 @@ function BuildUI()
     headerLine.BackgroundColor3 = C.Accent
     headerLine.BackgroundTransparency = 0.6
     headerLine.BorderSizePixel = 0
+    headerLine.ZIndex = 12
 
     local title = Instance.new("TextLabel", header)
     title.Size = UDim2.new(1, -160, 0, 32)
     title.Position = UDim2.new(0, 24, 0, 12)
     title.BackgroundTransparency = 1
+    title.ZIndex = 12
     title.Text = "FONDI MM2"
     title.TextColor3 = C.Text
     title.Font = Enum.Font.GothamBold
@@ -985,13 +925,13 @@ function BuildUI()
     subTitle.Size = UDim2.new(1, -160, 0, 16)
     subTitle.Position = UDim2.new(0, 24, 0, 42)
     subTitle.BackgroundTransparency = 1
-    subTitle.Text = "V10.0 • " .. (LP.DisplayName or "User")
+    subTitle.ZIndex = 12
+    subTitle.Text = "V10.1 • " .. (LP.DisplayName or "User")
     subTitle.TextColor3 = C.Accent2
     subTitle.Font = Enum.Font.Gotham
     subTitle.TextSize = 11
     subTitle.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Language button
     local langBtn = Instance.new("TextButton", header)
     langBtn.Size = UDim2.new(0, 46, 0, 30)
     langBtn.Position = UDim2.new(1, -100, 0, 20)
@@ -1002,8 +942,9 @@ function BuildUI()
     langBtn.TextSize = 12
     langBtn.BorderSizePixel = 0
     langBtn.AutoButtonColor = false
+    langBtn.ZIndex = 12
     Corner(langBtn, 10)
-    local lbStroke = Stroke(langBtn, C.Accent2, 1)
+    Stroke(langBtn, C.Accent2, 1)
 
     langBtn.MouseEnter:Connect(function() Tween(langBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(50, 50, 70)}) end)
     langBtn.MouseLeave:Connect(function() Tween(langBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(35, 35, 50)}) end)
@@ -1016,7 +957,6 @@ function BuildUI()
         BuildUI()
     end)
 
-    -- Close button
     local close = Instance.new("TextButton", header)
     close.Size = UDim2.new(0, 30, 0, 30)
     close.Position = UDim2.new(1, -50, 0, 20)
@@ -1027,6 +967,7 @@ function BuildUI()
     close.TextSize = 14
     close.BorderSizePixel = 0
     close.AutoButtonColor = false
+    close.ZIndex = 12
     Corner(close, 10)
 
     close.MouseEnter:Connect(function() Tween(close, 0.2, {BackgroundColor3 = Color3.fromRGB(80, 25, 30)}) end)
@@ -1044,13 +985,13 @@ function BuildUI()
         MainFrame.Position = UDim2.new(0.5, -240, 0.5, -290)
     end)
 
-    -- Tab bar
     local tabBar = Instance.new("Frame", MainFrame)
     tabBar.Size = UDim2.new(1, -24, 0, 38)
     tabBar.Position = UDim2.new(0, 12, 0, 82)
     tabBar.BackgroundColor3 = Color3.fromRGB(15, 15, 24)
     tabBar.BackgroundTransparency = 0.3
     tabBar.BorderSizePixel = 0
+    tabBar.ZIndex = 11
     Corner(tabBar, 12)
 
     local tabLayout = Instance.new("UIListLayout", tabBar)
@@ -1059,21 +1000,20 @@ function BuildUI()
     tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
-    -- Tab indicator (sliding underline)
     local indicator = Instance.new("Frame", tabBar)
     indicator.Size = UDim2.new(0, 60, 0, 3)
     indicator.Position = UDim2.new(0, 8, 1, -4)
     indicator.BackgroundColor3 = C.Accent
     indicator.BorderSizePixel = 0
+    indicator.ZIndex = 12
     Corner(indicator, 2)
 
-    -- Content area
     local contentArea = Instance.new("Frame", MainFrame)
     contentArea.Size = UDim2.new(1, -24, 1, -140)
     contentArea.Position = UDim2.new(0, 12, 0, 128)
     contentArea.BackgroundTransparency = 1
+    contentArea.ZIndex = 11
 
-    -- Tabs
     local tabData = {
         {id = "main", label = T("catMain")},
         {id = "move", label = T("catMove")},
@@ -1098,7 +1038,6 @@ function BuildUI()
             end
         end
 
-        -- Move indicator
         local activeBtn = tabButtons[id]
         if activeBtn then
             Tween(indicator, 0.3, {
@@ -1106,7 +1045,6 @@ function BuildUI()
                 Size = UDim2.new(0, activeBtn.AbsoluteSize.X, 0, 3)
             }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
-            -- Content fade in
             if tabContents[id] then
                 tabContents[id].Visible = true
             end
@@ -1124,6 +1062,7 @@ function BuildUI()
         btn.TextSize = 11
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
+        btn.ZIndex = 12
         Corner(btn, 8)
 
         tabButtons[t.id] = btn
@@ -1137,6 +1076,7 @@ function BuildUI()
         content.CanvasSize = UDim2.new(0, 0, 0, 0)
         content.AutomaticCanvasSize = Enum.AutomaticSize.Y
         content.Visible = false
+        content.ZIndex = 12
         local cl = Instance.new("UIListLayout", content)
         cl.Padding = UDim.new(0, 8)
 
@@ -1162,9 +1102,6 @@ function BuildUI()
     task.wait(0.05)
     ShowTab("main")
 
-    --==================================================
-    -- TOGGLE CREATOR
-    --==================================================
     local function CreateToggle(parent, name, setting, color, callback)
         color = color or C.Accent
 
@@ -1174,6 +1111,7 @@ function BuildUI()
         btn.Text = ""
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
+        btn.ZIndex = 15
         Corner(btn, 12)
 
         local bs = Stroke(btn, Settings[setting] and color or C.Border, 1.5)
@@ -1182,18 +1120,19 @@ function BuildUI()
         lbl.Size = UDim2.new(1, -100, 1, 0)
         lbl.Position = UDim2.new(0, 18, 0, 0)
         lbl.BackgroundTransparency = 1
+        lbl.ZIndex = 16
         lbl.Text = name
         lbl.TextColor3 = Settings[setting] and color or C.Text
         lbl.Font = Enum.Font.GothamBold
         lbl.TextSize = 13
         lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        -- Toggle pill
         local pill = Instance.new("Frame", btn)
         pill.Size = UDim2.new(0, 42, 0, 24)
         pill.Position = UDim2.new(1, -56, 0.5, -12)
         pill.BackgroundColor3 = Settings[setting] and color or Color3.fromRGB(50, 50, 70)
         pill.BorderSizePixel = 0
+        pill.ZIndex = 16
         Corner(pill, 12)
 
         local knob = Instance.new("Frame", pill)
@@ -1201,18 +1140,17 @@ function BuildUI()
         knob.Position = Settings[setting] and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
         knob.BackgroundColor3 = Color3.new(1,1,1)
         knob.BorderSizePixel = 0
+        knob.ZIndex = 17
         Corner(knob, 9)
 
-        -- Glow under pill when on
         local glow = Instance.new("Frame", pill)
         glow.Size = UDim2.new(1, 8, 1, 8)
         glow.Position = UDim2.new(0, -4, 0, -4)
         glow.BackgroundColor3 = color
         glow.BackgroundTransparency = Settings[setting] and 0.7 or 1
         glow.BorderSizePixel = 0
-        glow.ZIndex = 0
+        glow.ZIndex = 15
         Corner(glow, 15)
-        pill.ZIndex = 2
 
         btn.MouseEnter:Connect(function()
             Tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(32, 32, 46)})
@@ -1243,9 +1181,6 @@ function BuildUI()
         end)
     end
 
-    --==================================================
-    -- SLIDER CREATOR
-    --==================================================
     local function CreateSlider(parent, name, minV, maxV, default, color, setter)
         color = color or C.Accent
 
@@ -1253,6 +1188,7 @@ function BuildUI()
         frame.Size = UDim2.new(1, -5, 0, 48)
         frame.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
         frame.BorderSizePixel = 0
+        frame.ZIndex = 15
         Corner(frame, 12)
         Stroke(frame, C.Border, 1.5)
 
@@ -1260,6 +1196,7 @@ function BuildUI()
         lbl.Size = UDim2.new(1, -30, 0, 20)
         lbl.Position = UDim2.new(0, 18, 0, 6)
         lbl.BackgroundTransparency = 1
+        lbl.ZIndex = 16
         lbl.Text = name .. ": " .. default
         lbl.TextColor3 = C.Text
         lbl.Font = Enum.Font.GothamBold
@@ -1271,6 +1208,7 @@ function BuildUI()
         bar.Position = UDim2.new(0, 18, 0, 32)
         bar.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
         bar.BorderSizePixel = 0
+        bar.ZIndex = 16
         Corner(bar, 3)
 
         local rel = (default - minV) / (maxV - minV)
@@ -1278,6 +1216,7 @@ function BuildUI()
         fill.Size = UDim2.new(rel, 0, 1, 0)
         fill.BackgroundColor3 = color
         fill.BorderSizePixel = 0
+        fill.ZIndex = 17
         Corner(fill, 3)
 
         local knob = Instance.new("Frame", bar)
@@ -1285,6 +1224,7 @@ function BuildUI()
         knob.Position = UDim2.new(rel, -7, 0.5, -7)
         knob.BackgroundColor3 = Color3.new(1,1,1)
         knob.BorderSizePixel = 0
+        knob.ZIndex = 18
         Corner(knob, 7)
 
         local dragging = false
@@ -1311,9 +1251,6 @@ function BuildUI()
         end)
     end
 
-    --==================================================
-    -- MAIN TAB
-    --==================================================
     CreateToggle(tabContents["main"], T("esp"), "ESP", C.Accent, function(on)
         if on then
             for _, p in ipairs(Players:GetPlayers()) do
@@ -1329,9 +1266,6 @@ function BuildUI()
     CreateToggle(tabContents["main"], T("roles"), "ShowRoles", C.Purple2)
     CreateToggle(tabContents["main"], T("reveal"), "RevealMurderer", C.Murderer)
 
-    --==================================================
-    -- MOVEMENT TAB
-    --==================================================
     CreateToggle(tabContents["move"], T("fly"), "Fly", C.Blue, function(on)
         if on then StartFly() else StopFly() end
     end)
@@ -1348,9 +1282,6 @@ function BuildUI()
         if on then StartAntiFling() else StopAntiFling() end
     end)
 
-    --==================================================
-    -- COMBAT TAB
-    --==================================================
     CreateToggle(tabContents["combat"], T("aimbot"), "Aimbot", C.Danger, function(on)
         if on then StartAimbot() else StopAimbot() end
     end)
@@ -1364,22 +1295,22 @@ function BuildUI()
         if on then StartPickup() else StopPickup() end
     end)
 
-    -- FLING section
     local flingDivider = Instance.new("Frame", tabContents["combat"])
     flingDivider.Size = UDim2.new(1, -5, 0, 1)
     flingDivider.BackgroundColor3 = C.Border
     flingDivider.BorderSizePixel = 0
+    flingDivider.ZIndex = 15
 
     local flingTitle = Instance.new("TextLabel", tabContents["combat"])
     flingTitle.Size = UDim2.new(1, -5, 0, 20)
     flingTitle.BackgroundTransparency = 1
+    flingTitle.ZIndex = 15
     flingTitle.Text = T("flingTitle")
     flingTitle.TextColor3 = C.Accent2
     flingTitle.Font = Enum.Font.GothamBold
     flingTitle.TextSize = 11
     flingTitle.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Player selector button
     local selectedFlingTarget = nil
     local playerBtn = Instance.new("TextButton", tabContents["combat"])
     playerBtn.Size = UDim2.new(1, -5, 0, 42)
@@ -1390,10 +1321,10 @@ function BuildUI()
     playerBtn.TextSize = 12
     playerBtn.BorderSizePixel = 0
     playerBtn.AutoButtonColor = false
+    playerBtn.ZIndex = 15
     Corner(playerBtn, 12)
     Stroke(playerBtn, C.Border, 1.5)
 
-    -- Dropdown
     local dropdown = Instance.new("ScrollingFrame", tabContents["combat"])
     dropdown.Size = UDim2.new(1, -5, 0, 160)
     dropdown.BackgroundColor3 = Color3.fromRGB(15, 15, 24)
@@ -1403,6 +1334,7 @@ function BuildUI()
     dropdown.CanvasSize = UDim2.new(0, 0, 0, 0)
     dropdown.AutomaticCanvasSize = Enum.AutomaticSize.Y
     dropdown.Visible = false
+    dropdown.ZIndex = 25
     Corner(dropdown, 12)
     Stroke(dropdown, C.Accent, 1)
     local dLayout = Instance.new("UIListLayout", dropdown)
@@ -1427,6 +1359,7 @@ function BuildUI()
                 row.TextSize = 11
                 row.BorderSizePixel = 0
                 row.AutoButtonColor = false
+                row.ZIndex = 26
                 Corner(row, 6)
                 row.MouseEnter:Connect(function() Tween(row, 0.15, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
                 row.MouseLeave:Connect(function() Tween(row, 0.15, {BackgroundColor3 = Color3.fromRGB(22, 22, 32)}) end)
@@ -1457,6 +1390,7 @@ function BuildUI()
     flingBtn.TextSize = 12
     flingBtn.BorderSizePixel = 0
     flingBtn.AutoButtonColor = false
+    flingBtn.ZIndex = 15
     Corner(flingBtn, 12)
     Stroke(flingBtn, Color3.fromRGB(255, 100, 100), 1.5)
     flingBtn.MouseEnter:Connect(function() Tween(flingBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(255, 80, 80)}) end)
@@ -1480,6 +1414,7 @@ function BuildUI()
     flingAllBtn.TextSize = 12
     flingAllBtn.BorderSizePixel = 0
     flingAllBtn.AutoButtonColor = false
+    flingAllBtn.ZIndex = 15
     Corner(flingAllBtn, 12)
     flingAllBtn.MouseEnter:Connect(function() Tween(flingAllBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(230, 60, 100)}) end)
     flingAllBtn.MouseLeave:Connect(function() Tween(flingAllBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(200, 40, 80)}) end)
@@ -1491,22 +1426,16 @@ function BuildUI()
         end
     end)
 
-    --==================================================
-    -- FARM TAB
-    --==================================================
     CreateToggle(tabContents["farm"], T("farm"), "Farm", Color3.fromRGB(255, 200, 50), function(on)
         if on then StartFarm() else StopFarm() end
     end)
 
-    --==================================================
-    -- MISC TAB
-    --==================================================
     CreateToggle(tabContents["misc"], T("notif"), "Notifications", Color3.fromRGB(100, 200, 255))
 
-    -- Player list
     local listTitle = Instance.new("TextLabel", tabContents["misc"])
     listTitle.Size = UDim2.new(1, -5, 0, 22)
     listTitle.BackgroundTransparency = 1
+    listTitle.ZIndex = 15
     listTitle.Text = T("playerList")
     listTitle.TextColor3 = C.SubText
     listTitle.Font = Enum.Font.GothamBold
@@ -1518,6 +1447,7 @@ function BuildUI()
     playerList.AutomaticSize = Enum.AutomaticSize.Y
     playerList.BackgroundColor3 = Color3.fromRGB(15, 15, 24)
     playerList.BorderSizePixel = 0
+    playerList.ZIndex = 15
     Corner(playerList, 12)
     Stroke(playerList, C.Border, 1)
     local pll = Instance.new("UIListLayout", playerList)
@@ -1537,6 +1467,7 @@ function BuildUI()
                 row.Size = UDim2.new(1, -16, 0, 22)
                 row.Position = UDim2.new(0, 8, 0, 0)
                 row.BackgroundTransparency = 1
+                row.ZIndex = 16
                 row.Text = pl.DisplayName .. "  ·  " .. role
                 row.TextColor3 = RoleColor(role)
                 row.Font = Enum.Font.Gotham
@@ -1554,9 +1485,6 @@ function BuildUI()
         end
     end)
 
-    --==================================================
-    -- SHOW ANIMATION
-    --==================================================
     MainFrame.Size = UDim2.new(0, 0, 0, 0)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.BackgroundTransparency = 1
@@ -1570,12 +1498,9 @@ function BuildUI()
         BackgroundTransparency = 0.02
     }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     Tween(mainStroke, 0.5, {Transparency = 0})
-    Tween(outerGlow, 0.5, {BackgroundTransparency = 0.9})
+    Tween(outerGlow, 0.5, {BackgroundTransparency = 0.94})
 end
 
---==================================================
--- HOTKEYS
---==================================================
 local function ToggleMenu()
     if not MainGui or not MainGui.Parent then return end
     if not MainFrame.Visible then
@@ -1625,13 +1550,11 @@ UIS.InputBegan:Connect(function(input, gp)
     end
 end)
 
---==================================================
--- KEY GUI (new design)
---==================================================
 local KeyGui = Instance.new("ScreenGui")
 KeyGui.Name = "FondiKeyGui"
 KeyGui.ResetOnSpawn = false
 KeyGui.IgnoreGuiInset = true
+KeyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 KeyGui.Parent = pg
 
 local KeyFrame = Instance.new("Frame", KeyGui)
@@ -1641,6 +1564,7 @@ KeyFrame.BackgroundColor3 = C.Card
 KeyFrame.BackgroundTransparency = 0.02
 KeyFrame.BorderSizePixel = 0
 KeyFrame.Active = true
+KeyFrame.ZIndex = 10
 Corner(KeyFrame, 20)
 
 local keyStroke = Stroke(KeyFrame, C.Accent, 1.5)
@@ -1649,17 +1573,16 @@ local keyOuterGlow = Instance.new("Frame", KeyFrame)
 keyOuterGlow.Size = UDim2.new(1, 12, 1, 12)
 keyOuterGlow.Position = UDim2.new(0, -6, 0, -6)
 keyOuterGlow.BackgroundColor3 = C.Accent
-keyOuterGlow.BackgroundTransparency = 0.88
+keyOuterGlow.BackgroundTransparency = 0.92
 keyOuterGlow.BorderSizePixel = 0
 keyOuterGlow.ZIndex = 0
 Corner(keyOuterGlow, 24)
-KeyFrame.ZIndex = 2
 
--- Logo animation
 local keyLogo = Instance.new("TextLabel", KeyFrame)
 keyLogo.Size = UDim2.new(1, 0, 0, 50)
 keyLogo.Position = UDim2.new(0, 0, 0, 30)
 keyLogo.BackgroundTransparency = 1
+keyLogo.ZIndex = 15
 keyLogo.Text = "FONDI MM2"
 keyLogo.TextColor3 = C.Text
 keyLogo.Font = Enum.Font.GothamBold
@@ -1669,12 +1592,12 @@ local keySub = Instance.new("TextLabel", KeyFrame)
 keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 78)
 keySub.BackgroundTransparency = 1
-keySub.Text = "V10.0 • NEON"
+keySub.ZIndex = 15
+keySub.Text = "V10.1 • NEON"
 keySub.TextColor3 = C.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
 
--- Lang
 local keyLangBtn = Instance.new("TextButton", KeyFrame)
 keyLangBtn.Size = UDim2.new(0, 46, 0, 26)
 keyLangBtn.Position = UDim2.new(1, -58, 0, 12)
@@ -1685,6 +1608,7 @@ keyLangBtn.Font = Enum.Font.GothamBold
 keyLangBtn.TextSize = 12
 keyLangBtn.BorderSizePixel = 0
 keyLangBtn.AutoButtonColor = false
+keyLangBtn.ZIndex = 15
 Corner(keyLangBtn, 8)
 Stroke(keyLangBtn, C.Accent2, 1)
 keyLangBtn.MouseButton1Click:Connect(function()
@@ -1695,7 +1619,6 @@ keyLangBtn.MouseButton1Click:Connect(function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/p1shenak/main.lua/refs/heads/main/main.lua"))()
 end)
 
--- Key input
 local KeyBox = Instance.new("TextBox", KeyFrame)
 KeyBox.Size = UDim2.new(0.85, 0, 0, 48)
 KeyBox.Position = UDim2.new(0.075, 0, 0, 115)
@@ -1708,6 +1631,7 @@ KeyBox.PlaceholderColor3 = C.SubText
 KeyBox.Font = Enum.Font.Code
 KeyBox.TextSize = 14
 KeyBox.BorderSizePixel = 0
+KeyBox.ZIndex = 15
 Corner(KeyBox, 12)
 Stroke(KeyBox, C.Border, 1)
 
@@ -1735,6 +1659,7 @@ ActivateBtn.Font = Enum.Font.GothamBold
 ActivateBtn.TextSize = 14
 ActivateBtn.BorderSizePixel = 0
 ActivateBtn.AutoButtonColor = false
+ActivateBtn.ZIndex = 15
 Corner(ActivateBtn, 12)
 Stroke(ActivateBtn, C.Purple2, 1)
 
@@ -1743,11 +1668,13 @@ keyDivider.Size = UDim2.new(0.85, 0, 0, 1)
 keyDivider.Position = UDim2.new(0.075, 0, 0, 240)
 keyDivider.BackgroundColor3 = C.Border
 keyDivider.BorderSizePixel = 0
+keyDivider.ZIndex = 15
 
 local genTitle = Instance.new("TextLabel", KeyFrame)
 genTitle.Size = UDim2.new(1, 0, 0, 20)
 genTitle.Position = UDim2.new(0, 0, 0, 255)
 genTitle.BackgroundTransparency = 1
+genTitle.ZIndex = 15
 genTitle.Text = T("genTitle")
 genTitle.TextColor3 = C.SubText
 genTitle.Font = Enum.Font.GothamBold
@@ -1757,6 +1684,7 @@ local durFrame = Instance.new("Frame", KeyFrame)
 durFrame.Size = UDim2.new(0.85, 0, 0, 34)
 durFrame.Position = UDim2.new(0.075, 0, 0, 285)
 durFrame.BackgroundTransparency = 1
+durFrame.ZIndex = 15
 local durLayout = Instance.new("UIListLayout", durFrame)
 durLayout.FillDirection = Enum.FillDirection.Horizontal
 durLayout.Padding = UDim.new(0, 6)
@@ -1781,6 +1709,7 @@ for _, opt in ipairs(DURATIONS) do
     b.TextSize = 12
     b.BorderSizePixel = 0
     b.AutoButtonColor = false
+    b.ZIndex = 16
     Corner(b, 8)
     local bs = Stroke(b, C.Border, 1)
 
@@ -1813,6 +1742,7 @@ GenBtn.Font = Enum.Font.GothamBold
 GenBtn.TextSize = 13
 GenBtn.BorderSizePixel = 0
 GenBtn.AutoButtonColor = false
+GenBtn.ZIndex = 15
 Corner(GenBtn, 12)
 
 local CopyBtn = Instance.new("TextButton", KeyFrame)
@@ -1825,6 +1755,7 @@ CopyBtn.Font = Enum.Font.GothamBold
 CopyBtn.TextSize = 12
 CopyBtn.BorderSizePixel = 0
 CopyBtn.AutoButtonColor = false
+CopyBtn.ZIndex = 15
 Corner(CopyBtn, 12)
 Stroke(CopyBtn, C.Accent2, 1)
 
@@ -1838,10 +1769,10 @@ GetScriptBtn.Font = Enum.Font.GothamBold
 GetScriptBtn.TextSize = 12
 GetScriptBtn.BorderSizePixel = 0
 GetScriptBtn.AutoButtonColor = false
+GetScriptBtn.ZIndex = 15
 Corner(GetScriptBtn, 12)
 Stroke(GetScriptBtn, C.Accent2, 1)
 
--- Hover effects
 ActivateBtn.MouseEnter:Connect(function() Tween(ActivateBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(150, 100, 255)}) end)
 ActivateBtn.MouseLeave:Connect(function() Tween(ActivateBtn, 0.2, {BackgroundColor3 = C.Accent}) end)
 GenBtn.MouseEnter:Connect(function() Tween(GenBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(20, 210, 140)}) end)
@@ -1851,7 +1782,6 @@ CopyBtn.MouseLeave:Connect(function() Tween(CopyBtn, 0.2, {BackgroundColor3 = Co
 GetScriptBtn.MouseEnter:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
 GetScriptBtn.MouseLeave:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(30, 30, 45)}) end)
 
--- Keyframe show animation
 KeyFrame.Size = UDim2.new(0, 0, 0, 0)
 KeyFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 task.wait(0.05)
@@ -1936,9 +1866,6 @@ GetScriptBtn.MouseButton1Click:Connect(function()
     end
 end)
 
---==================================================
--- AUTOLOGIN + LOADING SCREEN
---==================================================
 task.spawn(function()
     task.wait(0.5)
     local saved = LoadKey()
@@ -1966,6 +1893,6 @@ do
 end
 
 print("==========================================")
-print("[FONDI MM2 V10.0] NEON UI READY")
+print("[FONDI MM2 V10.1] NEON UI READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
