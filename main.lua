@@ -1,11 +1,10 @@
 --[[
-    FONDI MM2 V10.1 // NEON UI (ZIndex FIXED)
-    - Красивое меню с анимациями запуска
-    - Плавные переходы между вкладками
-    - Particle burst при клике
-    - Loading screen
-    - ESP / Fly / Noclip / Bhop / Anti-Fling / Aimbot / Kill All / Farm / Fling / Reveal / Anti-Kick
-    - RU/EN
+    FONDI MM2 V11.0 // VISUALS EDITION
+    - Hitmarker / Kill Effect / Damage Indicator
+    - Watermark / FPS Graph / Custom Crosshair
+    - Kill Notification / Rainbow Trail
+    - Kill Sound (asset 136998941171548)
+    - Все прошлые функции
 ]]
 
 local Players = game:GetService("Players")
@@ -14,6 +13,7 @@ local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local SoundService = game:GetService("SoundService")
+local Stats = game:GetService("Stats")
 
 local LP = Players.LocalPlayer
 local pg = LP:WaitForChild("PlayerGui")
@@ -30,7 +30,11 @@ local Settings = {
     ESP=false, Outline=true, Tracers=true, ShowNames=true, ShowRoles=true,
     Fly=false, Noclip=false, Bhop=false, AntiFling=false, FlySpeed=55,
     Aimbot=false, RevealMurderer=false, AutoPickup=false,
-    KillAll=false, KillAuraRange=15, Farm=false, Notifications=true
+    KillAll=false, KillAuraRange=15, Farm=false, Notifications=true,
+    -- Visuals
+    KillSound=true, Hitmarker=true, DamageIndicator=true,
+    Watermark=true, FpsGraph=true, Crosshair=true,
+    KillEffect=true, KillNotif=true, RainbowTrail=false
 }
 
 local C = {
@@ -41,7 +45,6 @@ local C = {
     Accent2  = Color3.fromRGB(34, 211, 238),
     Bg       = Color3.fromRGB(10, 10, 15),
     Card     = Color3.fromRGB(18, 18, 26),
-    Card2    = Color3.fromRGB(24, 24, 34),
     Text     = Color3.fromRGB(255, 255, 255),
     SubText  = Color3.fromRGB(140, 140, 160),
     Border   = Color3.fromRGB(45, 45, 60),
@@ -61,64 +64,56 @@ local I18N = {
         names="Имена", roles="Роли", fly="Полёт", noclip="Noclip",
         bhop="Bhop", antifling="Anti-Fling", aimbot="Aimbot",
         killall="Kill All", pickup="Auto-Pickup", reveal="Reveal Murderer",
-        range="Радиус", farm="Farm (Монеты)", notif="Уведомления",
-        spectator="Spectator", flingTitle="FLING",
-        flingBtn="ВЫБРОСИТЬ", flingAll="ВЫБРОСИТЬ ВСЕХ",
+        range="Радиус", farm="Farm", notif="Уведомления",
+        flingTitle="FLING", flingBtn="ВЫБРОСИТЬ", flingAll="ВЫБРОСИТЬ ВСЕХ",
         playerList="СПИСОК ИГРОКОВ",
         keyInput="Введите ключ", keyInvalid="Неверный ключ",
-        keyExpired="Сессия истекла", activate="АКТИВИРОВАТЬ",
-        checking="ПРОВЕРКА...", autologin="АВТОВХОД...",
+        activate="АКТИВИРОВАТЬ", checking="ПРОВЕРКА...", autologin="АВТОВХОД...",
         genTitle="Генерация ключа", generate="СГЕНЕРИРОВАТЬ",
         generating="ГЕНЕРАЦИЯ...", done="ГОТОВО",
         copyKey="СКОПИРОВАТЬ", copied="СКОПИРОВАНО",
         getScript="ССЫЛКА", linkCopied="Ссылка скопирована!",
-        accessGranted="Доступ разрешён",
-        autologinOk="Автовход выполнен",
-        sessionExpired="Сессия истекла",
+        accessGranted="Доступ разрешён", autologinOk="Автовход выполнен",
         keyCreated="Ключ создан", keyCopiedMsg="Ключ скопирован!",
-        noKey="Нет ключа", errorMsg="Ошибка",
-        noPlayers="Нет игроков", invalidKey="Неверный ключ",
-        flightOn="FLY: ВКЛ", flightOff="FLY: ВЫКЛ",
-        noclipOn="NOCLIP: ВКЛ", noclipOff="NOCLIP: ВЫКЛ",
-        bhopOn="BHOP: ВКЛ", bhopOff="BHOP: ВЫКЛ",
+        noKey="Нет ключа", noPlayers="Нет игроков", invalidKey="Неверный ключ",
         langBtn="EN", becameM=" стал MURDERER", becameS=" стал SHERIFF",
-        clipUnavailable="setclipboard недоступен",
         catMain="ГЛАВНОЕ", catMove="ДВИЖЕНИЕ", catCombat="БОЙ",
-        catFarm="ФАРМ", catMisc="РАЗНОЕ", catSettings="НАСТРОЙКИ",
-        on="ВКЛ", off="ВЫКЛ", selectPlayer="ВЫБРАТЬ ИГРОКА",
-        selected="ВЫБРАН: ", loading="ЗАГРУЗКА", ready="ГОТОВО"
+        catFarm="ФАРМ", catMisc="РАЗНОЕ", catVisual="ВИЗУАЛЫ",
+        selectPlayer="ВЫБРАТЬ ИГРОКА", selected="ВЫБРАН: ",
+        loading="ЗАГРУЗКА", ready="ГОТОВО",
+        visKillSound="Звук убийства", visHitmarker="Хитмаркер",
+        visDamage="Индикатор урона", visWatermark="Watermark",
+        visFps="График FPS", visCrosshair="Прицел",
+        visKillEffect="Эффект убийства", visKillNotif="Уведомление убийства",
+        visTrail="Радужный след"
     },
     en = {
         menu="FONDI MM2", esp="ESP", outline="Outline", tracers="Tracers",
         names="Names", roles="Roles", fly="Fly", noclip="Noclip",
         bhop="Bhop", antifling="Anti-Fling", aimbot="Aimbot",
         killall="Kill All", pickup="Auto-Pickup", reveal="Reveal Murderer",
-        range="Range", farm="Farm (Coins)", notif="Notifications",
-        spectator="Spectator", flingTitle="FLING",
-        flingBtn="FLING", flingAll="FLING ALL",
+        range="Range", farm="Farm", notif="Notifications",
+        flingTitle="FLING", flingBtn="FLING", flingAll="FLING ALL",
         playerList="PLAYER LIST",
         keyInput="Enter key", keyInvalid="Invalid key",
-        keyExpired="Session expired", activate="ACTIVATE",
-        checking="CHECKING...", autologin="AUTO-LOGIN...",
+        activate="ACTIVATE", checking="CHECKING...", autologin="AUTO-LOGIN...",
         genTitle="Generate key", generate="GENERATE",
         generating="GENERATING...", done="DONE",
         copyKey="COPY", copied="COPIED",
         getScript="LINK", linkCopied="Link copied!",
-        accessGranted="Access granted",
-        autologinOk="Auto-login OK",
-        sessionExpired="Session expired",
+        accessGranted="Access granted", autologinOk="Auto-login OK",
         keyCreated="Key created", keyCopiedMsg="Key copied!",
-        noKey="No key", errorMsg="Error",
-        noPlayers="No players", invalidKey="Invalid key",
-        flightOn="FLY: ON", flightOff="FLY: OFF",
-        noclipOn="NOCLIP: ON", noclipOff="NOCLIP: OFF",
-        bhopOn="BHOP: ON", bhopOff="BHOP: OFF",
+        noKey="No key", noPlayers="No players", invalidKey="Invalid key",
         langBtn="RU", becameM=" became MURDERER", becameS=" became SHERIFF",
-        clipUnavailable="setclipboard unavailable",
         catMain="MAIN", catMove="MOVEMENT", catCombat="COMBAT",
-        catFarm="FARM", catMisc="MISC", catSettings="SETTINGS",
-        on="ON", off="OFF", selectPlayer="SELECT PLAYER",
-        selected="SELECTED: ", loading="LOADING", ready="READY"
+        catFarm="FARM", catMisc="MISC", catVisual="VISUALS",
+        selectPlayer="SELECT PLAYER", selected="SELECTED: ",
+        loading="LOADING", ready="READY",
+        visKillSound="Kill Sound", visHitmarker="Hitmarker",
+        visDamage="Damage Indicator", visWatermark="Watermark",
+        visFps="FPS Graph", visCrosshair="Crosshair",
+        visKillEffect="Kill Effect", visKillNotif="Kill Notification",
+        visTrail="Rainbow Trail"
     }
 }
 local function T(k) return (I18N[Lang] and I18N[Lang][k]) or k end
@@ -144,6 +139,9 @@ local function Tween(o, t, props, style, dir)
     return tw
 end
 
+--==================================================
+-- HTTP / AUTH
+--==================================================
 local function HttpPost(url, body)
     local json = HttpService:JSONEncode(body)
     local ok, result = pcall(function()
@@ -198,6 +196,9 @@ local function LoadLang()
     if ok and (c == "ru" or c == "en") then return c end
 end
 
+--==================================================
+-- NOTIFY
+--==================================================
 local function Notify(text, color, duration)
     duration = duration or 3
     local sg = pg:FindFirstChild("Fondi_Notify")
@@ -218,6 +219,7 @@ local function Notify(text, color, duration)
     frame.BackgroundColor3 = C.Card
     frame.BackgroundTransparency = 0.05
     frame.BorderSizePixel = 0
+    frame.ZIndex = 5
     frame.Parent = sg
     Corner(frame, 12)
     local st = Stroke(frame, color, 1.5)
@@ -228,21 +230,22 @@ local function Notify(text, color, duration)
     glow.BackgroundColor3 = color
     glow.BackgroundTransparency = 0.85
     glow.BorderSizePixel = 0
-    glow.ZIndex = 0
+    glow.ZIndex = 4
     Corner(glow, 14)
-    frame.ZIndex = 2
 
     local accent = Instance.new("Frame", frame)
     accent.Size = UDim2.new(0, 3, 1, -12)
     accent.Position = UDim2.new(0, 6, 0, 6)
     accent.BackgroundColor3 = color
     accent.BorderSizePixel = 0
+    accent.ZIndex = 6
     Corner(accent, 3)
 
     local label = Instance.new("TextLabel", frame)
     label.Size = UDim2.new(1, -30, 1, 0)
     label.Position = UDim2.new(0, 20, 0, 0)
     label.BackgroundTransparency = 1
+    label.ZIndex = 6
     label.Text = tostring(text)
     label.TextColor3 = C.Text
     label.Font = Enum.Font.GothamBold
@@ -290,6 +293,7 @@ local function BurstFrom(el)
         p.Position = UDim2.fromOffset(cx, cy)
         p.BackgroundColor3 = colors[math.random(1, #colors)]
         p.BorderSizePixel = 0
+        p.ZIndex = 10
         Corner(p, 3)
 
         local angle = (math.pi * 2 * i) / 12 + math.random() * 0.5
@@ -311,6 +315,11 @@ ToggleSound.SoundId = "rbxassetid://133095302935970"
 ToggleSound.Volume = 0.4
 ToggleSound.Parent = SoundService
 
+local KillSound = Instance.new("Sound")
+KillSound.SoundId = "rbxassetid://136998941171548"
+KillSound.Volume = 1
+KillSound.Parent = SoundService
+
 local function PlayClick()
     pcall(function()
         ToggleSound:Stop()
@@ -319,6 +328,18 @@ local function PlayClick()
     end)
 end
 
+local function PlayKillSound()
+    if not Settings.KillSound then return end
+    pcall(function()
+        KillSound:Stop()
+        KillSound.TimePosition = 0
+        KillSound:Play()
+    end)
+end
+
+--==================================================
+-- ROLE
+--==================================================
 local function GetRole(player)
     if not player then return "Innocent" end
     local char = player.Character
@@ -330,6 +351,26 @@ local function GetRole(player)
 end
 local function RoleColor(r) return C[r] or C.Innocent end
 
+--==================================================
+-- KILL TRACKER
+--==================================================
+local hitTimestamps = {}  -- [player] = os.clock()
+
+local function RegisterHit(player)
+    if player and player ~= LP then
+        hitTimestamps[player] = os.clock()
+    end
+end
+
+local function WasOurKill(player)
+    local t = hitTimestamps[player]
+    if not t then return false end
+    return (os.clock() - t) < 1.5
+end
+
+--==================================================
+-- ESP
+--==================================================
 local ESPObjects, PlayerConnections = {}, {}
 local lastRoles = {}
 
@@ -438,14 +479,42 @@ local function DisconnectPlayer(player)
     PlayerConnections[player] = nil
 end
 
+local function OnPlayerDied(player)
+    if player == LP then return end
+    if WasOurKill(player) then
+        -- Kill sound
+        PlayKillSound()
+        -- Kill notification
+        if Settings.KillNotif then
+            KillNotification(player.DisplayName)
+        end
+        -- Kill effect
+        if Settings.KillEffect then
+            ShowKillEffect()
+        end
+    end
+    hitTimestamps[player] = nil
+end
+
 local function SetupPlayer(player)
     if player == LP then return end
     DisconnectPlayer(player)
     PlayerConnections[player] = {}
 
+    local function watchHumanoid(char)
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local dc = hum.Died:Connect(function()
+                OnPlayerDied(player)
+            end)
+            table.insert(PlayerConnections[player], dc)
+        end
+    end
+
     local ca = player.CharacterAdded:Connect(function(char)
         RemoveESP(player)
         char:WaitForChild("HumanoidRootPart", 10)
+        watchHumanoid(char)
         task.wait(0.25)
         if player.Parent and player.Character == char and Settings.ESP then CreateESP(player) end
     end)
@@ -469,6 +538,7 @@ local function SetupPlayer(player)
         task.spawn(function()
             local char = player.Character
             char:WaitForChild("HumanoidRootPart", 5)
+            watchHumanoid(char)
             if player.Character == char and Settings.ESP then
                 task.wait(0.2); CreateESP(player)
             end
@@ -479,7 +549,21 @@ end
 for _, p in ipairs(Players:GetPlayers()) do if p ~= LP then SetupPlayer(p) end end
 Players.PlayerAdded:Connect(SetupPlayer)
 Players.PlayerRemoving:Connect(function(p)
-    RemoveESP(p); DisconnectPlayer(p); lastRoles[p] = nil
+    RemoveESP(p); DisconnectPlayer(p); lastRoles[p] = nil; hitTimestamps[p] = nil
+end)
+
+-- Reattach died listener for existing humanoids
+task.spawn(function()
+    task.wait(2)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hum and not hum:GetAttribute("FondiHooked") then
+                hum:SetAttribute("FondiHooked", true)
+                hum.Died:Connect(function() OnPlayerDied(p) end)
+            end
+        end
+    end
 end)
 
 task.spawn(function()
@@ -509,6 +593,360 @@ task.spawn(function()
     end
 end)
 
+--==================================================
+-- VISUALS: HUD GUI
+--==================================================
+local HudGui = Instance.new("ScreenGui")
+HudGui.Name = "Fondi_Hud"
+HudGui.ResetOnSpawn = false
+HudGui.IgnoreGuiInset = true
+HudGui.DisplayOrder = 500
+HudGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+HudGui.Parent = pg
+
+-- Crosshair
+local crosshair = Instance.new("Frame", HudGui)
+crosshair.Size = UDim2.new(0, 20, 0, 20)
+crosshair.Position = UDim2.new(0.5, -10, 0.5, -10)
+crosshair.BackgroundTransparency = 1
+crosshair.ZIndex = 100
+
+local function makeCrossLine(size, pos)
+    local l = Instance.new("Frame", crosshair)
+    l.Size = size
+    l.Position = pos
+    l.BackgroundColor3 = C.Accent2
+    l.BorderSizePixel = 0
+    l.ZIndex = 100
+    return l
+end
+
+makeCrossLine(UDim2.new(0, 2, 0, 6), UDim2.new(0.5, -1, 0, 0))
+makeCrossLine(UDim2.new(0, 2, 0, 6), UDim2.new(0.5, -1, 1, -6))
+makeCrossLine(UDim2.new(0, 6, 0, 2), UDim2.new(0, 0, 0.5, -1))
+makeCrossLine(UDim2.new(0, 6, 0, 2), UDim2.new(1, -6, 0.5, -1))
+
+local crossDot = Instance.new("Frame", crosshair)
+crossDot.Size = UDim2.new(0, 2, 0, 2)
+crossDot.Position = UDim2.new(0.5, -1, 0.5, -1)
+crossDot.BackgroundColor3 = C.Accent
+crossDot.BorderSizePixel = 0
+crossDot.ZIndex = 100
+
+crosshair.Visible = false
+
+-- Watermark
+local watermark = Instance.new("Frame", HudGui)
+watermark.Size = UDim2.new(0, 220, 0, 26)
+watermark.Position = UDim2.new(0, 12, 0, 12)
+watermark.BackgroundColor3 = C.Card
+watermark.BackgroundTransparency = 0.15
+watermark.BorderSizePixel = 0
+watermark.ZIndex = 100
+Corner(watermark, 8)
+Stroke(watermark, C.Accent, 1)
+
+local wmLabel = Instance.new("TextLabel", watermark)
+wmLabel.Size = UDim2.new(1, -12, 1, 0)
+wmLabel.Position = UDim2.new(0, 6, 0, 0)
+wmLabel.BackgroundTransparency = 1
+wmLabel.ZIndex = 101
+wmLabel.Text = "FONDI MM2 v11.0 | 60 FPS | 0 ms"
+wmLabel.TextColor3 = C.Text
+wmLabel.Font = Enum.Font.GothamBold
+wmLabel.TextSize = 11
+wmLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+watermark.Visible = false
+
+-- FPS Graph
+local fpsGraphBg = Instance.new("Frame", HudGui)
+fpsGraphBg.Size = UDim2.new(0, 220, 0, 60)
+fpsGraphBg.Position = UDim2.new(0, 12, 0, 44)
+fpsGraphBg.BackgroundColor3 = C.Card
+fpsGraphBg.BackgroundTransparency = 0.2
+fpsGraphBg.BorderSizePixel = 0
+fpsGraphBg.ZIndex = 100
+Corner(fpsGraphBg, 8)
+Stroke(fpsGraphBg, C.Accent2, 1)
+
+local fpsGraph = Instance.new("Frame", fpsGraphBg)
+fpsGraph.Size = UDim2.new(1, -12, 1, -12)
+fpsGraph.Position = UDim2.new(0, 6, 0, 6)
+fpsGraph.BackgroundTransparency = 1
+fpsGraph.ClipsDescendants = true
+fpsGraph.ZIndex = 101
+
+local fpsValues = {}
+for i = 1, 40 do fpsValues[i] = 60 end
+
+fpsGraphBg.Visible = false
+
+-- Hitmarker
+local hitmarker = Instance.new("Frame", HudGui)
+hitmarker.Size = UDim2.new(0, 30, 0, 30)
+hitmarker.Position = UDim2.new(0.5, -15, 0.5, -15)
+hitmarker.BackgroundTransparency = 1
+hitmarker.ZIndex = 200
+hitmarker.Visible = false
+
+local function makeHitLine(size, pos, rot)
+    local l = Instance.new("Frame", hitmarker)
+    l.Size = size
+    l.Position = pos
+    l.BackgroundColor3 = Color3.new(1, 1, 1)
+    l.BorderSizePixel = 0
+    l.Rotation = rot
+    l.ZIndex = 200
+    return l
+end
+makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(0, 4, 0, 4), 45)
+makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(1, -6, 0, 4), -45)
+makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(0, 4, 1, -12), -45)
+makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(1, -6, 1, -12), 45)
+
+-- Kill Notification
+local killNotif = Instance.new("Frame", HudGui)
+killNotif.Size = UDim2.new(0, 320, 0, 50)
+killNotif.Position = UDim2.new(0.5, -160, 0, -70)
+killNotif.BackgroundColor3 = C.Card
+killNotif.BackgroundTransparency = 0.05
+killNotif.BorderSizePixel = 0
+killNotif.ZIndex = 300
+Corner(killNotif, 10)
+Stroke(killNotif, C.Danger, 2)
+
+local killNotifAccent = Instance.new("Frame", killNotif)
+killNotifAccent.Size = UDim2.new(0, 4, 1, -12)
+killNotifAccent.Position = UDim2.new(0, 6, 0, 6)
+killNotifAccent.BackgroundColor3 = C.Danger
+killNotifAccent.BorderSizePixel = 0
+killNotifAccent.ZIndex = 301
+Corner(killNotifAccent, 3)
+
+local killNotifLabel = Instance.new("TextLabel", killNotif)
+killNotifLabel.Size = UDim2.new(1, -30, 1, 0)
+killNotifLabel.Position = UDim2.new(0, 20, 0, 0)
+killNotifLabel.BackgroundTransparency = 1
+killNotifLabel.ZIndex = 301
+killNotifLabel.Text = ""
+killNotifLabel.TextColor3 = C.Text
+killNotifLabel.Font = Enum.Font.GothamBold
+killNotifLabel.TextSize = 14
+killNotifLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+killNotif.Visible = false
+
+local function KillNotification(victimName)
+    killNotifLabel.Text = "☠  YOU KILLED  " .. victimName
+    killNotif.Visible = true
+    killNotif.Position = UDim2.new(0.5, -160, 0, -70)
+    killNotif.BackgroundTransparency = 1
+    killNotifLabel.TextTransparency = 1
+
+    Tween(killNotif, 0.4, {
+        Position = UDim2.new(0.5, -160, 0, 20),
+        BackgroundTransparency = 0.05
+    }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    Tween(killNotifLabel, 0.3, {TextTransparency = 0})
+
+    task.delay(2.5, function()
+        Tween(killNotif, 0.3, {
+            Position = UDim2.new(0.5, -160, 0, -70),
+            BackgroundTransparency = 1
+        }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        Tween(killNotifLabel, 0.3, {TextTransparency = 1})
+        task.wait(0.35)
+        killNotif.Visible = false
+    end)
+end
+
+-- Kill Effect (flash at center)
+local killEffect = Instance.new("Frame", HudGui)
+killEffect.Size = UDim2.new(0, 200, 0, 200)
+killEffect.Position = UDim2.new(0.5, -100, 0.5, -100)
+killEffect.BackgroundColor3 = C.Danger
+killEffect.BackgroundTransparency = 1
+killEffect.BorderSizePixel = 0
+killEffect.ZIndex = 250
+Corner(killEffect, 100)
+
+local function ShowKillEffect()
+    killEffect.BackgroundTransparency = 0.6
+    killEffect.Size = UDim2.new(0, 50, 0, 50)
+    killEffect.Position = UDim2.new(0.5, -25, 0.5, -25)
+
+    Tween(killEffect, 0.4, {
+        Size = UDim2.new(0, 300, 0, 300),
+        Position = UDim2.new(0.5, -150, 0.5, -150),
+        BackgroundTransparency = 1
+    }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+end
+
+-- Hitmarker function
+local function ShowHitmarker()
+    if not Settings.Hitmarker then return end
+    hitmarker.Visible = true
+    hitmarker.Size = UDim2.new(0, 30, 0, 30)
+    hitmarker.Position = UDim2.new(0.5, -15, 0.5, -15)
+
+    for _, child in ipairs(hitmarker:GetChildren()) do
+        if child:IsA("Frame") then
+            child.BackgroundColor3 = Color3.new(1, 1, 1)
+        end
+    end
+
+    Tween(hitmarker, 0.3, {
+        Size = UDim2.new(0, 40, 0, 40),
+        Position = UDim2.new(0.5, -20, 0.5, -20)
+    }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+    task.delay(0.25, function()
+        hitmarker.Visible = false
+    end)
+end
+
+-- Damage Indicator (arrows)
+local damageIndicators = {}
+
+local function ShowDamageDirection(angle)
+    if not Settings.DamageIndicator then return end
+    local arrow = Instance.new("Frame", HudGui)
+    arrow.Size = UDim2.new(0, 30, 0, 30)
+    arrow.BackgroundColor3 = C.Danger
+    arrow.BackgroundTransparency = 0.3
+    arrow.BorderSizePixel = 0
+    arrow.Rotation = math.deg(angle)
+    arrow.ZIndex = 220
+    Corner(arrow, 6)
+
+    local radius = 150
+    local cx = 0.5 + math.cos(angle) * 0.15
+    local cy = 0.5 + math.sin(angle) * 0.15
+    arrow.Position = UDim2.new(cx, -15, cy, -15)
+
+    Tween(arrow, 1, {BackgroundTransparency = 1}, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    task.delay(1.05, function() arrow:Destroy() end)
+end
+
+-- Rainbow Trail
+local trailAttachments = {}
+local trailColors = {
+    Color3.fromRGB(255, 0, 0),
+    Color3.fromRGB(255, 150, 0),
+    Color3.fromRGB(255, 255, 0),
+    Color3.fromRGB(0, 255, 0),
+    Color3.fromRGB(0, 200, 255),
+    Color3.fromRGB(150, 0, 255),
+    Color3.fromRGB(255, 0, 200)
+}
+
+local function ClearTrail()
+    for _, a in ipairs(trailAttachments) do
+        pcall(function() a:Destroy() end)
+    end
+    trailAttachments = {}
+end
+
+local function CreateTrail()
+    ClearTrail()
+    local char = LP.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local prev = nil
+    for i = 1, 6 do
+        local a = Instance.new("Attachment", hrp)
+        a.Name = "FondiTrail_" .. i
+        table.insert(trailAttachments, a)
+        if prev then
+            local beam = Instance.new("Beam")
+            beam.Attachment0 = prev
+            beam.Attachment1 = a
+            beam.Width0 = 2
+            beam.Width1 = 2
+            beam.FaceCamera = true
+            beam.Color = ColorSequence.new(trailColors[i % #trailColors + 1])
+            beam.Transparency = NumberSequence.new(0.3)
+            beam.Parent = hrp
+            table.insert(trailAttachments, beam)
+        end
+        prev = a
+    end
+end
+
+--==================================================
+-- UPDATE LOOPS FOR HUD
+--==================================================
+task.spawn(function()
+    while task.wait(0.5) do
+        -- Watermark
+        if Settings.Watermark then
+            watermark.Visible = true
+            local fps = math.floor(1 / RunService.RenderStepped:Wait())
+            local ping = 0
+            pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
+            wmLabel.Text = string.format("FONDI MM2 v11.0 | %d FPS | %d ms", fps, ping)
+        else
+            watermark.Visible = false
+        end
+
+        -- FPS Graph
+        if Settings.FpsGraph then
+            fpsGraphBg.Visible = true
+
+            -- Sample fps
+            local fps = math.floor(1 / RunService.RenderStepped:Wait())
+            table.remove(fpsValues, 1)
+            table.insert(fpsValues, fps)
+
+            -- Redraw bars
+            for _, c in ipairs(fpsGraph:GetChildren()) do
+                if c:IsA("Frame") then c:Destroy() end
+            end
+
+            local count = #fpsValues
+            local barWidth = fpsGraph.AbsoluteSize.X / count
+            for i, val in ipairs(fpsValues) do
+                local bar = Instance.new("Frame", fpsGraph)
+                local h = math.clamp(val / 120, 0, 1)
+                bar.Size = UDim2.new(0, math.max(barWidth - 1, 1), h, 0)
+                bar.Position = UDim2.new(0, (i-1) * barWidth, 1, 0)
+                bar.AnchorPoint = Vector2.new(0, 1)
+                bar.BackgroundColor3 = val >= 50 and C.Green or (val >= 30 and C.Warning or C.Danger)
+                bar.BorderSizePixel = 0
+                bar.ZIndex = 102
+            end
+        else
+            fpsGraphBg.Visible = false
+        end
+
+        -- Crosshair
+        crosshair.Visible = Settings.Crosshair
+
+        -- Trail
+        if Settings.RainbowTrail then
+            if #trailAttachments == 0 then
+                CreateTrail()
+            end
+        else
+            if #trailAttachments > 0 then
+                ClearTrail()
+            end
+        end
+    end
+end)
+
+-- Re-attach trail on respawn
+LP.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Settings.RainbowTrail then CreateTrail() end
+end)
+
+--==================================================
+-- NOCLIP
+--==================================================
 local noclipConnection = nil
 local function StopNoclip()
     if noclipConnection then noclipConnection:Disconnect(); noclipConnection = nil end
@@ -529,6 +967,9 @@ local function StartNoclip()
     end)
 end
 
+--==================================================
+-- FLY
+--==================================================
 local flyConnection, flyActive = nil, false
 local function StopFly()
     flyActive = false
@@ -567,6 +1008,9 @@ local function StartFly()
     end)
 end
 
+--==================================================
+-- BHOP
+--==================================================
 local bhopConnection = nil
 local function StopBhop()
     if bhopConnection then bhopConnection:Disconnect(); bhopConnection = nil end
@@ -587,6 +1031,9 @@ local function StartBhop()
     end)
 end
 
+--==================================================
+-- ANTI-FLING
+--==================================================
 local afConnection = nil
 local function StopAntiFling()
     if afConnection then afConnection:Disconnect(); afConnection = nil end
@@ -606,6 +1053,9 @@ local function StartAntiFling()
     end)
 end
 
+--==================================================
+-- AIMBOT
+--==================================================
 local aimbotConnection = nil
 local function StopAimbot()
     if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
@@ -636,6 +1086,9 @@ local function StartAimbot()
     end)
 end
 
+--==================================================
+-- PICKUP
+--==================================================
 local pickupConnection = nil
 local function StopPickup()
     if pickupConnection then pickupConnection:Disconnect(); pickupConnection = nil end
@@ -658,6 +1111,9 @@ local function StartPickup()
     end)
 end
 
+--==================================================
+-- KILL ALL
+--==================================================
 local killAllConnection = nil
 local function GetWeapon()
     local c = LP.Character
@@ -684,12 +1140,17 @@ local function StartKillAll()
                 if tr and (tr.Position - r.Position).Magnitude < Settings.KillAuraRange then
                     r.CFrame = CFrame.new(r.Position, Vector3.new(tr.Position.X, r.Position.Y, tr.Position.Z))
                     pcall(function() w:Activate() end)
+                    RegisterHit(pl)
+                    ShowHitmarker()
                 end
             end
         end
     end)
 end
 
+--==================================================
+-- FLING
+--==================================================
 local function FlingPlayer(target)
     if not target or not target.Character then return end
     local tr = target.Character:FindFirstChild("HumanoidRootPart")
@@ -701,6 +1162,9 @@ local function FlingPlayer(target)
     Notify("FLING → " .. target.DisplayName, C.Pink, 2)
 end
 
+--==================================================
+-- FARM
+--==================================================
 local farmConnection = nil
 local function StopFarm()
     if farmConnection then farmConnection:Disconnect(); farmConnection = nil end
@@ -724,6 +1188,9 @@ local function StartFarm()
     end)
 end
 
+--==================================================
+-- ANTI-KICK
+--==================================================
 pcall(function()
     local oldKick = hookfunction or hookfunc
     if oldKick and LP.Kick then
@@ -735,6 +1202,32 @@ pcall(function()
     end
 end)
 
+--==================================================
+-- DAMAGE DETECTION
+--==================================================
+task.spawn(function()
+    while task.wait(0.1) do
+        if not IsAuthenticated then continue end
+        local char = LP.Character
+        if not char then continue end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health < (hum:GetAttribute("FondiLastHP") or hum.MaxHealth) then
+            -- Damage taken
+            local lastHP = hum:GetAttribute("FondiLastHP") or hum.MaxHealth
+            if hum.Health < lastHP and Settings.DamageIndicator then
+                -- Random angle since we can't know exact source
+                ShowDamageDirection(math.random() * math.pi * 2)
+            end
+        end
+        if hum then
+            hum:SetAttribute("FondiLastHP", hum.Health)
+        end
+    end
+end)
+
+--==================================================
+-- LOADING SCREEN
+--==================================================
 local function ShowLoadingScreen(callback)
     local loadingGui = Instance.new("ScreenGui")
     loadingGui.Name = "FondiLoading"
@@ -784,7 +1277,7 @@ local function ShowLoadingScreen(callback)
     logo2.Position = UDim2.new(0, 0, 0.4, -5)
     logo2.BackgroundTransparency = 1
     logo2.ZIndex = 5
-    logo2.Text = "MM2 V10.1"
+    logo2.Text = "MM2 V11.0"
     logo2.TextColor3 = C.Accent2
     logo2.Font = Enum.Font.GothamBold
     logo2.TextSize = 16
@@ -824,7 +1317,7 @@ local function ShowLoadingScreen(callback)
     task.spawn(function()
         local stages = {
             {T("loading") .. " UI...", 25},
-            {T("loading") .. " ESP...", 55},
+            {T("loading") .. " Visuals...", 55},
             {T("loading") .. " Functions...", 80},
             {T("ready") .. "!", 100}
         }
@@ -850,26 +1343,19 @@ local function ShowLoadingScreen(callback)
     end)
 end
 
+--==================================================
+-- MAIN UI
+--==================================================
 local MainGui, MainFrame
 
 function BuildUI()
     if MainGui then pcall(function() MainGui:Destroy() end) end
     MainGui = Instance.new("ScreenGui")
-    MainGui.Name = "Fondi_V10"
+    MainGui.Name = "Fondi_V11"
     MainGui.ResetOnSpawn = false
     MainGui.IgnoreGuiInset = true
     MainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     MainGui.Parent = pg
-
-    local bgGlow = Instance.new("Frame", MainGui)
-    bgGlow.Size = UDim2.new(0, 500, 0, 500)
-    bgGlow.Position = UDim2.new(0.5, -250, 0.5, -250)
-    bgGlow.BackgroundColor3 = C.Accent
-    bgGlow.BackgroundTransparency = 0.96
-    bgGlow.BorderSizePixel = 0
-    bgGlow.ZIndex = 0
-    Corner(bgGlow, 250)
-    Tween(bgGlow, 4, {Size = UDim2.new(0, 700, 0, 700), Position = UDim2.new(0.5, -350, 0.5, -350)}, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
 
     MainFrame = Instance.new("Frame", MainGui)
     MainFrame.Size = UDim2.new(0, 480, 0, 580)
@@ -883,16 +1369,6 @@ function BuildUI()
     Corner(MainFrame, 20)
 
     local mainStroke = Stroke(MainFrame, C.Accent, 1.5)
-    mainStroke.Transparency = 0
-
-    local outerGlow = Instance.new("Frame", MainFrame)
-    outerGlow.Size = UDim2.new(1, 12, 1, 12)
-    outerGlow.Position = UDim2.new(0, -6, 0, -6)
-    outerGlow.BackgroundColor3 = C.Accent
-    outerGlow.BackgroundTransparency = 0.94
-    outerGlow.BorderSizePixel = 0
-    outerGlow.ZIndex = 0
-    Corner(outerGlow, 24)
 
     local header = Instance.new("Frame", MainFrame)
     header.Size = UDim2.new(1, 0, 0, 70)
@@ -901,14 +1377,6 @@ function BuildUI()
     header.BorderSizePixel = 0
     header.ZIndex = 11
     Corner(header, 20)
-
-    local headerLine = Instance.new("Frame", header)
-    headerLine.Size = UDim2.new(1, -40, 0, 1)
-    headerLine.Position = UDim2.new(0, 20, 1, -1)
-    headerLine.BackgroundColor3 = C.Accent
-    headerLine.BackgroundTransparency = 0.6
-    headerLine.BorderSizePixel = 0
-    headerLine.ZIndex = 12
 
     local title = Instance.new("TextLabel", header)
     title.Size = UDim2.new(1, -160, 0, 32)
@@ -926,7 +1394,7 @@ function BuildUI()
     subTitle.Position = UDim2.new(0, 24, 0, 42)
     subTitle.BackgroundTransparency = 1
     subTitle.ZIndex = 12
-    subTitle.Text = "V10.1 • " .. (LP.DisplayName or "User")
+    subTitle.Text = "V11.0 • " .. (LP.DisplayName or "User")
     subTitle.TextColor3 = C.Accent2
     subTitle.Font = Enum.Font.Gotham
     subTitle.TextSize = 11
@@ -996,7 +1464,7 @@ function BuildUI()
 
     local tabLayout = Instance.new("UIListLayout", tabBar)
     tabLayout.FillDirection = Enum.FillDirection.Horizontal
-    tabLayout.Padding = UDim.new(0, 4)
+    tabLayout.Padding = UDim.new(0, 3)
     tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     tabLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
@@ -1018,6 +1486,7 @@ function BuildUI()
         {id = "main", label = T("catMain")},
         {id = "move", label = T("catMove")},
         {id = "combat", label = T("catCombat")},
+        {id = "visual", label = T("catVisual")},
         {id = "farm", label = T("catFarm")},
         {id = "misc", label = T("catMisc")}
     }
@@ -1053,13 +1522,13 @@ function BuildUI()
 
     for _, t in ipairs(tabData) do
         local btn = Instance.new("TextButton", tabBar)
-        btn.Size = UDim2.new(0, 76, 0, 30)
+        btn.Size = UDim2.new(0, 66, 0, 30)
         btn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
         btn.BackgroundTransparency = 1
         btn.Text = t.label
         btn.TextColor3 = C.SubText
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 11
+        btn.TextSize = 10
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
         btn.ZIndex = 12
@@ -1106,7 +1575,7 @@ function BuildUI()
         color = color or C.Accent
 
         local btn = Instance.new("TextButton", parent)
-        btn.Size = UDim2.new(1, -5, 0, 46)
+        btn.Size = UDim2.new(1, -5, 0, 42)
         btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(30, 30, 48) or Color3.fromRGB(22, 22, 32)
         btn.Text = ""
         btn.BorderSizePixel = 0
@@ -1124,7 +1593,7 @@ function BuildUI()
         lbl.Text = name
         lbl.TextColor3 = Settings[setting] and color or C.Text
         lbl.Font = Enum.Font.GothamBold
-        lbl.TextSize = 13
+        lbl.TextSize = 12
         lbl.TextXAlignment = Enum.TextXAlignment.Left
 
         local pill = Instance.new("Frame", btn)
@@ -1142,15 +1611,6 @@ function BuildUI()
         knob.BorderSizePixel = 0
         knob.ZIndex = 17
         Corner(knob, 9)
-
-        local glow = Instance.new("Frame", pill)
-        glow.Size = UDim2.new(1, 8, 1, 8)
-        glow.Position = UDim2.new(0, -4, 0, -4)
-        glow.BackgroundColor3 = color
-        glow.BackgroundTransparency = Settings[setting] and 0.7 or 1
-        glow.BorderSizePixel = 0
-        glow.ZIndex = 15
-        Corner(glow, 15)
 
         btn.MouseEnter:Connect(function()
             Tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(32, 32, 46)})
@@ -1172,7 +1632,6 @@ function BuildUI()
             Tween(bs, 0.25, {Color = on and color or C.Border})
             Tween(lbl, 0.25, {TextColor3 = on and color or C.Text})
             Tween(pill, 0.25, {BackgroundColor3 = on and color or Color3.fromRGB(50, 50, 70)})
-            Tween(glow, 0.3, {BackgroundTransparency = on and 0.7 or 1})
             Tween(knob, 0.3, {
                 Position = on and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
             }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
@@ -1251,6 +1710,7 @@ function BuildUI()
         end)
     end
 
+    -- MAIN TAB
     CreateToggle(tabContents["main"], T("esp"), "ESP", C.Accent, function(on)
         if on then
             for _, p in ipairs(Players:GetPlayers()) do
@@ -1266,6 +1726,7 @@ function BuildUI()
     CreateToggle(tabContents["main"], T("roles"), "ShowRoles", C.Purple2)
     CreateToggle(tabContents["main"], T("reveal"), "RevealMurderer", C.Murderer)
 
+    -- MOVE TAB
     CreateToggle(tabContents["move"], T("fly"), "Fly", C.Blue, function(on)
         if on then StartFly() else StopFly() end
     end)
@@ -1282,6 +1743,7 @@ function BuildUI()
         if on then StartAntiFling() else StopAntiFling() end
     end)
 
+    -- COMBAT TAB
     CreateToggle(tabContents["combat"], T("aimbot"), "Aimbot", C.Danger, function(on)
         if on then StartAimbot() else StopAimbot() end
     end)
@@ -1294,12 +1756,6 @@ function BuildUI()
     CreateToggle(tabContents["combat"], T("pickup"), "AutoPickup", Color3.fromRGB(200, 200, 100), function(on)
         if on then StartPickup() else StopPickup() end
     end)
-
-    local flingDivider = Instance.new("Frame", tabContents["combat"])
-    flingDivider.Size = UDim2.new(1, -5, 0, 1)
-    flingDivider.BackgroundColor3 = C.Border
-    flingDivider.BorderSizePixel = 0
-    flingDivider.ZIndex = 15
 
     local flingTitle = Instance.new("TextLabel", tabContents["combat"])
     flingTitle.Size = UDim2.new(1, -5, 0, 20)
@@ -1361,8 +1817,6 @@ function BuildUI()
                 row.AutoButtonColor = false
                 row.ZIndex = 26
                 Corner(row, 6)
-                row.MouseEnter:Connect(function() Tween(row, 0.15, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
-                row.MouseLeave:Connect(function() Tween(row, 0.15, {BackgroundColor3 = Color3.fromRGB(22, 22, 32)}) end)
                 row.MouseButton1Click:Connect(function()
                     selectedFlingTarget = pl
                     playerBtn.Text = T("selected") .. pl.DisplayName
@@ -1373,8 +1827,6 @@ function BuildUI()
         end
     end
 
-    playerBtn.MouseEnter:Connect(function() Tween(playerBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(35, 35, 50)}) end)
-    playerBtn.MouseLeave:Connect(function() Tween(playerBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(22, 22, 32)}) end)
     playerBtn.MouseButton1Click:Connect(function()
         RefreshDropdown()
         dropdown.Visible = not dropdown.Visible
@@ -1392,14 +1844,8 @@ function BuildUI()
     flingBtn.AutoButtonColor = false
     flingBtn.ZIndex = 15
     Corner(flingBtn, 12)
-    Stroke(flingBtn, Color3.fromRGB(255, 100, 100), 1.5)
-    flingBtn.MouseEnter:Connect(function() Tween(flingBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(255, 80, 80)}) end)
-    flingBtn.MouseLeave:Connect(function() Tween(flingBtn, 0.2, {BackgroundColor3 = C.Danger}) end)
     flingBtn.MouseButton1Click:Connect(function()
-        if not selectedFlingTarget then
-            Notify("FLING", T("noPlayers"), C.Warning, 2)
-            return
-        end
+        if not selectedFlingTarget then return end
         PlayClick()
         BurstFrom(flingBtn)
         FlingPlayer(selectedFlingTarget)
@@ -1416,8 +1862,6 @@ function BuildUI()
     flingAllBtn.AutoButtonColor = false
     flingAllBtn.ZIndex = 15
     Corner(flingAllBtn, 12)
-    flingAllBtn.MouseEnter:Connect(function() Tween(flingAllBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(230, 60, 100)}) end)
-    flingAllBtn.MouseLeave:Connect(function() Tween(flingAllBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(200, 40, 80)}) end)
     flingAllBtn.MouseButton1Click:Connect(function()
         PlayClick()
         BurstFrom(flingAllBtn)
@@ -1426,10 +1870,23 @@ function BuildUI()
         end
     end)
 
+    -- VISUAL TAB
+    CreateToggle(tabContents["visual"], T("visKillSound"), "KillSound", C.Danger)
+    CreateToggle(tabContents["visual"], T("visHitmarker"), "Hitmarker", C.Accent2)
+    CreateToggle(tabContents["visual"], T("visDamage"), "DamageIndicator", C.Warning)
+    CreateToggle(tabContents["visual"], T("visWatermark"), "Watermark", C.Purple2)
+    CreateToggle(tabContents["visual"], T("visFps"), "FpsGraph", C.Green)
+    CreateToggle(tabContents["visual"], T("visCrosshair"), "Crosshair", C.Accent)
+    CreateToggle(tabContents["visual"], T("visKillEffect"), "KillEffect", C.Pink)
+    CreateToggle(tabContents["visual"], T("visKillNotif"), "KillNotif", C.Blue)
+    CreateToggle(tabContents["visual"], T("visTrail"), "RainbowTrail", C.Orange)
+
+    -- FARM TAB
     CreateToggle(tabContents["farm"], T("farm"), "Farm", Color3.fromRGB(255, 200, 50), function(on)
         if on then StartFarm() else StopFarm() end
     end)
 
+    -- MISC TAB
     CreateToggle(tabContents["misc"], T("notif"), "Notifications", Color3.fromRGB(100, 200, 255))
 
     local listTitle = Instance.new("TextLabel", tabContents["misc"])
@@ -1487,31 +1944,25 @@ function BuildUI()
 
     MainFrame.Size = UDim2.new(0, 0, 0, 0)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    MainFrame.BackgroundTransparency = 1
-    mainStroke.Transparency = 1
-    outerGlow.BackgroundTransparency = 1
-
     task.wait(0.05)
     Tween(MainFrame, 0.5, {
         Size = UDim2.new(0, 480, 0, 580),
-        Position = UDim2.new(0.5, -240, 0.5, -290),
-        BackgroundTransparency = 0.02
+        Position = UDim2.new(0.5, -240, 0.5, -290)
     }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    Tween(mainStroke, 0.5, {Transparency = 0})
-    Tween(outerGlow, 0.5, {BackgroundTransparency = 0.94})
 end
 
+--==================================================
+-- HOTKEYS
+--==================================================
 local function ToggleMenu()
     if not MainGui or not MainGui.Parent then return end
     if not MainFrame.Visible then
         MainFrame.Visible = true
         MainFrame.Size = UDim2.new(0, 0, 0, 0)
         MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-        MainFrame.BackgroundTransparency = 1
         Tween(MainFrame, 0.4, {
             Size = UDim2.new(0, 480, 0, 580),
-            Position = UDim2.new(0.5, -240, 0.5, -290),
-            BackgroundTransparency = 0.02
+            Position = UDim2.new(0.5, -240, 0.5, -290)
         }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     else
         Tween(MainFrame, 0.3, {
@@ -1532,15 +1983,12 @@ UIS.InputBegan:Connect(function(input, gp)
     elseif input.KeyCode == Enum.KeyCode.F then
         Settings.Fly = not Settings.Fly
         if Settings.Fly then StartFly() else StopFly() end
-        Notify(Settings.Fly and T("flightOn") or T("flightOff"), Settings.Fly and C.Success or C.Danger)
     elseif input.KeyCode == Enum.KeyCode.N then
         Settings.Noclip = not Settings.Noclip
         if Settings.Noclip then StartNoclip() else StopNoclip() end
-        Notify(Settings.Noclip and T("noclipOn") or T("noclipOff"), Settings.Noclip and C.Success or C.Danger)
     elseif input.KeyCode == Enum.KeyCode.B then
         Settings.Bhop = not Settings.Bhop
         if Settings.Bhop then StartBhop() else StopBhop() end
-        Notify(Settings.Bhop and T("bhopOn") or T("bhopOff"), Settings.Bhop and C.Success or C.Danger)
     elseif input.KeyCode == Enum.KeyCode.K then
         Settings.KillAll = not Settings.KillAll
         if Settings.KillAll then StartKillAll() else StopKillAll() end
@@ -1550,6 +1998,9 @@ UIS.InputBegan:Connect(function(input, gp)
     end
 end)
 
+--==================================================
+-- KEY GUI
+--==================================================
 local KeyGui = Instance.new("ScreenGui")
 KeyGui.Name = "FondiKeyGui"
 KeyGui.ResetOnSpawn = false
@@ -1566,17 +2017,7 @@ KeyFrame.BorderSizePixel = 0
 KeyFrame.Active = true
 KeyFrame.ZIndex = 10
 Corner(KeyFrame, 20)
-
-local keyStroke = Stroke(KeyFrame, C.Accent, 1.5)
-
-local keyOuterGlow = Instance.new("Frame", KeyFrame)
-keyOuterGlow.Size = UDim2.new(1, 12, 1, 12)
-keyOuterGlow.Position = UDim2.new(0, -6, 0, -6)
-keyOuterGlow.BackgroundColor3 = C.Accent
-keyOuterGlow.BackgroundTransparency = 0.92
-keyOuterGlow.BorderSizePixel = 0
-keyOuterGlow.ZIndex = 0
-Corner(keyOuterGlow, 24)
+Stroke(KeyFrame, C.Accent, 1.5)
 
 local keyLogo = Instance.new("TextLabel", KeyFrame)
 keyLogo.Size = UDim2.new(1, 0, 0, 50)
@@ -1593,7 +2034,7 @@ keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 78)
 keySub.BackgroundTransparency = 1
 keySub.ZIndex = 15
-keySub.Text = "V10.1 • NEON"
+keySub.Text = "V11.0 • VISUALS"
 keySub.TextColor3 = C.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -1610,7 +2051,6 @@ keyLangBtn.BorderSizePixel = 0
 keyLangBtn.AutoButtonColor = false
 keyLangBtn.ZIndex = 15
 Corner(keyLangBtn, 8)
-Stroke(keyLangBtn, C.Accent2, 1)
 keyLangBtn.MouseButton1Click:Connect(function()
     Lang = (Lang == "ru") and "en" or "ru"
     SaveLang(Lang)
@@ -1635,20 +2075,6 @@ KeyBox.ZIndex = 15
 Corner(KeyBox, 12)
 Stroke(KeyBox, C.Border, 1)
 
-local KeyBoxFocus = Instance.new("UIStroke", KeyBox)
-KeyBoxFocus.Color = C.Accent
-KeyBoxFocus.Thickness = 0
-KeyBoxFocus.Transparency = 1
-
-KeyBox.Focused:Connect(function()
-    Tween(KeyBoxFocus, 0.2, {Thickness = 1.5, Transparency = 0})
-    Tween(KeyBox, 0.2, {BackgroundColor3 = Color3.fromRGB(15, 15, 25)})
-end)
-KeyBox.FocusLost:Connect(function()
-    Tween(KeyBoxFocus, 0.2, {Thickness = 0, Transparency = 1})
-    Tween(KeyBox, 0.2, {BackgroundColor3 = Color3.fromRGB(10, 10, 16)})
-end)
-
 local ActivateBtn = Instance.new("TextButton", KeyFrame)
 ActivateBtn.Size = UDim2.new(0.85, 0, 0, 46)
 ActivateBtn.Position = UDim2.new(0.075, 0, 0, 172)
@@ -1661,14 +2087,13 @@ ActivateBtn.BorderSizePixel = 0
 ActivateBtn.AutoButtonColor = false
 ActivateBtn.ZIndex = 15
 Corner(ActivateBtn, 12)
-Stroke(ActivateBtn, C.Purple2, 1)
 
-local keyDivider = Instance.new("Frame", KeyFrame)
-keyDivider.Size = UDim2.new(0.85, 0, 0, 1)
-keyDivider.Position = UDim2.new(0.075, 0, 0, 240)
-keyDivider.BackgroundColor3 = C.Border
-keyDivider.BorderSizePixel = 0
-keyDivider.ZIndex = 15
+local divider = Instance.new("Frame", KeyFrame)
+divider.Size = UDim2.new(0.85, 0, 0, 1)
+divider.Position = UDim2.new(0.075, 0, 0, 240)
+divider.BackgroundColor3 = C.Border
+divider.BorderSizePixel = 0
+divider.ZIndex = 15
 
 local genTitle = Instance.new("TextLabel", KeyFrame)
 genTitle.Size = UDim2.new(1, 0, 0, 20)
@@ -1691,10 +2116,8 @@ durLayout.Padding = UDim.new(0, 6)
 durLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 local DURATIONS = {
-    {label = "1D", value = "1d"},
-    {label = "7D", value = "7d"},
-    {label = "30D", value = "30d"},
-    {label = "∞", value = "inf"}
+    {label = "1D", value = "1d"}, {label = "7D", value = "7d"},
+    {label = "30D", value = "30d"}, {label = "∞", value = "inf"}
 }
 local selectedDuration = "1d"
 local durButtons = {}
@@ -1757,7 +2180,6 @@ CopyBtn.BorderSizePixel = 0
 CopyBtn.AutoButtonColor = false
 CopyBtn.ZIndex = 15
 Corner(CopyBtn, 12)
-Stroke(CopyBtn, C.Accent2, 1)
 
 local GetScriptBtn = Instance.new("TextButton", KeyFrame)
 GetScriptBtn.Size = UDim2.new(0.42, 0, 0, 42)
@@ -1771,16 +2193,6 @@ GetScriptBtn.BorderSizePixel = 0
 GetScriptBtn.AutoButtonColor = false
 GetScriptBtn.ZIndex = 15
 Corner(GetScriptBtn, 12)
-Stroke(GetScriptBtn, C.Accent2, 1)
-
-ActivateBtn.MouseEnter:Connect(function() Tween(ActivateBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(150, 100, 255)}) end)
-ActivateBtn.MouseLeave:Connect(function() Tween(ActivateBtn, 0.2, {BackgroundColor3 = C.Accent}) end)
-GenBtn.MouseEnter:Connect(function() Tween(GenBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(20, 210, 140)}) end)
-GenBtn.MouseLeave:Connect(function() Tween(GenBtn, 0.2, {BackgroundColor3 = C.Success}) end)
-CopyBtn.MouseEnter:Connect(function() Tween(CopyBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
-CopyBtn.MouseLeave:Connect(function() Tween(CopyBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(30, 30, 45)}) end)
-GetScriptBtn.MouseEnter:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
-GetScriptBtn.MouseLeave:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(30, 30, 45)}) end)
 
 KeyFrame.Size = UDim2.new(0, 0, 0, 0)
 KeyFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -1790,35 +2202,30 @@ Tween(KeyFrame, 0.5, {
     Position = UDim2.new(0.5, -210, 0.5, -275)
 }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
-local function CloseKeyGui()
-    Tween(KeyFrame, 0.3, {
-        Size = UDim2.new(0, 0, 0, 0),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        BackgroundTransparency = 1
-    }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-    task.wait(0.35)
-    KeyGui:Destroy()
-    BuildUI()
-end
-
 ActivateBtn.MouseButton1Click:Connect(function()
     if KeyBox.Text == "" then Notify(T("keyInput"), C.Warning) return end
     ActivateBtn.Text = T("checking")
     ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
     PlayClick()
     BurstFrom(ActivateBtn)
-    local valid, info = ValidateKey(KeyBox.Text)
+    local valid = ValidateKey(KeyBox.Text)
     if valid then
         IsAuthenticated = true
         SaveKey(KeyBox.Text)
         Notify(T("accessGranted"), C.Success)
-        CloseKeyGui()
+        Tween(KeyFrame, 0.3, {
+            Size = UDim2.new(0, 0, 0, 0),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.wait(0.35)
+        KeyGui:Destroy()
+        ShowLoadingScreen(function() BuildUI() end)
     else
         KeyBox.Text = ""
         KeyBox.PlaceholderText = T("keyInvalid")
         ActivateBtn.Text = T("activate")
         ActivateBtn.BackgroundColor3 = C.Accent
-        Notify(info or T("invalidKey"), C.Danger)
+        Notify(T("invalidKey"), C.Danger)
     end
 end)
 
@@ -1866,6 +2273,9 @@ GetScriptBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+--==================================================
+-- AUTOLOGIN
+--==================================================
 task.spawn(function()
     task.wait(0.5)
     local saved = LoadKey()
@@ -1893,6 +2303,6 @@ do
 end
 
 print("==========================================")
-print("[FONDI MM2 V10.1] NEON UI READY")
+print("[FONDI MM2 V11.0] VISUALS READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
