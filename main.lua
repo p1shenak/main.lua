@@ -1,10 +1,10 @@
 --[[
-    FONDI MM2 V6.0 // NEON EDITION
+    FONDI MM2 V6.2 // STEALTH + GET SCRIPT
+    - Fly через CFrame (без BodyVelocity)
+    - Noclip через Humanoid State
     - Online key auth через Vercel API
-    - Toggle-свитчи с анимациями
+    - Кнопка "Получить скрипт" (копирует ссылку сайта)
     - ESP / Outline / Tracers / Names / Roles
-    - Fly / Noclip / Spectator
-    - Player List
     - Hotkeys: [L] menu, [F] Fly, [N] Noclip
 ]]
 
@@ -22,10 +22,11 @@ local LP = Players.LocalPlayer
 local pg = LP:WaitForChild("PlayerGui")
 
 --==================================================
--- CONFIG — замени на свой URL Vercel
+-- CONFIG
 --==================================================
-local AUTH_URL = "https://fondi-mm2-auntification.vercel.app/api/validate"
-local GENERATE_URL = "https://fondi-mm2-auntification.vercel.app/api/generate"
+local AUTH_URL = "https://fondi-mm-2-auntification.vercel.app/api/validate"
+local GENERATE_URL = "https://fondi-mm-2-auntification.vercel.app/api/generate"
+local SITE_URL = "https://fondi-mm-2-auntification.vercel.app/"
 
 --==================================================
 -- SETTINGS
@@ -395,7 +396,6 @@ Players.PlayerRemoving:Connect(function(p)
     DisconnectPlayer(p)
 end)
 
--- Auto repair
 task.spawn(function()
     while task.wait(0.5) do
         if Settings.ESP and IsAuthenticated then
@@ -416,68 +416,97 @@ task.spawn(function()
 end)
 
 --==================================================
--- NOCLIP
+-- NOCLIP (STEALTH)
 --==================================================
-RunService.Stepped:Connect(function()
-    if not IsAuthenticated or not Settings.Noclip then return end
-    local c = LP.Character
-    if not c then return end
-    for _, o in ipairs(c:GetDescendants()) do
-        if o:IsA("BasePart") then o.CanCollide = false end
+local noclipConnection = nil
+
+local function StopNoclip()
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
     end
-end)
+    local c = LP.Character
+    if c then
+        local h = c:FindFirstChildOfClass("Humanoid")
+        if h then
+            pcall(function() h:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+        end
+    end
+end
+
+local function StartNoclip()
+    StopNoclip()
+    noclipConnection = RunService.Stepped:Connect(function()
+        if not IsAuthenticated or not Settings.Noclip then return end
+        local c = LP.Character
+        if not c then return end
+        local h = c:FindFirstChildOfClass("Humanoid")
+        if not h then return end
+        pcall(function()
+            h:ChangeState(Enum.HumanoidStateType.StrafingNoPhysics)
+        end)
+    end)
+end
 
 --==================================================
--- FLY
+-- FLY (STEALTH — CFrame based)
 --==================================================
-local flyBV, flyBG = nil, nil
+local flyConnection = nil
+local flyActive = false
 
 local function StopFly()
-    if flyBV then pcall(function() flyBV:Destroy() end) flyBV = nil end
-    if flyBG then pcall(function() flyBG:Destroy() end) flyBG = nil end
+    flyActive = false
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    local c = LP.Character
+    if c then
+        local h = c:FindFirstChildOfClass("Humanoid")
+        if h then
+            pcall(function() h.PlatformStand = false end)
+        end
+    end
 end
 
 local function StartFly()
-    local c = LP.Character
-    if not c then return end
-    local root = c:FindFirstChild("HumanoidRootPart")
-    if not root then return end
     StopFly()
-    flyBV = Instance.new("BodyVelocity")
-    flyBV.MaxForce = Vector3.new(1e7, 1e7, 1e7)
-    flyBV.Velocity = Vector3.zero
-    flyBV.Parent = root
-    flyBG = Instance.new("BodyGyro")
-    flyBG.MaxTorque = Vector3.new(1e7, 1e7, 1e7)
-    flyBG.D = 100
-    flyBG.Parent = root
-end
+    flyActive = true
 
-RunService.RenderStepped:Connect(function()
-    if not IsAuthenticated or not Settings.Fly then StopFly(); return end
-    local c = LP.Character
-    if not c then StopFly(); return end
-    local root = c:FindFirstChild("HumanoidRootPart")
-    if not root then StopFly(); return end
-    if not flyBV or not flyBV.Parent or not flyBG or not flyBG.Parent then StartFly() end
-    if not flyBV or not flyBG then return end
-    local cam = workspace.CurrentCamera
-    if not cam then return end
-    local move = Vector3.zero
-    if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
-    if UIS:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
-    if UIS:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
-    if UIS:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
-    if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0, 1, 0) end
-    if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0, 1, 0) end
-    flyBV.Velocity = move.Magnitude > 0 and (move.Unit * Settings.FlySpeed) or Vector3.zero
-    flyBG.CFrame = cam.CFrame
-end)
+    flyConnection = RunService.RenderStepped:Connect(function(dt)
+        if not IsAuthenticated or not Settings.Fly or not flyActive then return end
+        local c = LP.Character
+        if not c then return end
+        local r = c:FindFirstChild("HumanoidRootPart")
+        local h = c:FindFirstChildOfClass("Humanoid")
+        if not r or not h then return end
+
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        local move = Vector3.zero
+        if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0, 1, 0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0, 1, 0) end
+
+        if move.Magnitude > 0 then
+            local speed = Settings.FlySpeed
+            local delta = move.Unit * speed * dt
+            r.CFrame = r.CFrame + delta
+            r.Velocity = Vector3.zero
+        end
+    end)
+end
 
 LP.CharacterAdded:Connect(function()
     StopFly()
+    StopNoclip()
     task.wait(0.5)
     if Settings.Fly and IsAuthenticated then StartFly() end
+    if Settings.Noclip and IsAuthenticated then StartNoclip() end
 end)
 
 --==================================================
@@ -496,8 +525,8 @@ backdrop.BackgroundTransparency = 0.5
 backdrop.BorderSizePixel = 0
 
 local KeyFrame = Instance.new("Frame", KeyGui)
-KeyFrame.Size = UDim2.new(0, 400, 0, 480)
-KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -240)
+KeyFrame.Size = UDim2.new(0, 400, 0, 530)
+KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -265)
 KeyFrame.BackgroundColor3 = COLORS.Card
 KeyFrame.BackgroundTransparency = 0.03
 KeyFrame.BorderSizePixel = 0
@@ -518,7 +547,7 @@ local keySub = Instance.new("TextLabel", KeyFrame)
 keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 72)
 keySub.BackgroundTransparency = 1
-keySub.Text = "V6.0 • ONLINE AUTH"
+keySub.Text = "V6.2 • STEALTH EDITION"
 keySub.TextColor3 = COLORS.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -641,17 +670,32 @@ CopyBtn.AutoButtonColor = false
 Corner(CopyBtn, 10)
 Stroke(CopyBtn, COLORS.Accent2, 1)
 
+local GetScriptBtn = Instance.new("TextButton", KeyFrame)
+GetScriptBtn.Size = UDim2.new(0.85, 0, 0, 42)
+GetScriptBtn.Position = UDim2.new(0.075, 0, 0, 441)
+GetScriptBtn.Text = "ПОЛУЧИТЬ СКРИПТ"
+GetScriptBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
+GetScriptBtn.TextColor3 = COLORS.Accent2
+GetScriptBtn.Font = Enum.Font.GothamBold
+GetScriptBtn.TextSize = 13
+GetScriptBtn.BorderSizePixel = 0
+GetScriptBtn.AutoButtonColor = false
+Corner(GetScriptBtn, 10)
+Stroke(GetScriptBtn, COLORS.Accent2, 1)
+
 ActivateBtn.MouseEnter:Connect(function() Tween(ActivateBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(145, 80, 255)}) end)
 ActivateBtn.MouseLeave:Connect(function() Tween(ActivateBtn, 0.2, {BackgroundColor3 = COLORS.Accent}) end)
 GenBtn.MouseEnter:Connect(function() Tween(GenBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(20, 210, 140)}) end)
 GenBtn.MouseLeave:Connect(function() Tween(GenBtn, 0.2, {BackgroundColor3 = COLORS.Success}) end)
 CopyBtn.MouseEnter:Connect(function() Tween(CopyBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
 CopyBtn.MouseLeave:Connect(function() Tween(CopyBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)}) end)
+GetScriptBtn.MouseEnter:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}) end)
+GetScriptBtn.MouseLeave:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)}) end)
 
-KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -200)
-Tween(KeyFrame, 0.5, {Position = UDim2.new(0.5, -200, 0.5, -240)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
+Tween(KeyFrame, 0.5, {Position = UDim2.new(0.5, -200, 0.5, -265)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
--- AUTH ACTION
+-- AUTH
 ActivateBtn.MouseButton1Click:Connect(function()
     if KeyBox.Text == "" then Notify("Введите ключ", COLORS.Warning); return end
     ActivateBtn.Text = "ПРОВЕРКА..."
@@ -661,7 +705,7 @@ ActivateBtn.MouseButton1Click:Connect(function()
     if valid then
         IsAuthenticated = true
         Notify("ДОСТУП РАЗРЕШЁН", COLORS.Success)
-        Tween(KeyFrame, 0.3, {Position = UDim2.new(0.5, -200, 0.5, -200), BackgroundTransparency = 1}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        Tween(KeyFrame, 0.3, {Position = UDim2.new(0.5, -200, 0.5, -225), BackgroundTransparency = 1}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
         for _, obj in ipairs(KeyFrame:GetDescendants()) do
             if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
                 Tween(obj, 0.3, {TextTransparency = 1})
@@ -689,7 +733,7 @@ ActivateBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- GENERATE ACTION
+-- GENERATE
 GenBtn.MouseButton1Click:Connect(function()
     GenBtn.Text = "ГЕНЕРАЦИЯ..."
     GenBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
@@ -711,15 +755,30 @@ GenBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
--- COPY ACTION
+-- COPY KEY
 CopyBtn.MouseButton1Click:Connect(function()
     if KeyBox.Text == "" then Notify("Нет ключа", COLORS.Warning); return end
     if setclipboard then
         setclipboard(KeyBox.Text)
-        Notify("Скопировано", COLORS.Success)
+        Notify("Ключ скопирован!", COLORS.Success)
         CopyBtn.Text = "✓ СКОПИРОВАНО"
         task.wait(1.2)
         CopyBtn.Text = "СКОПИРОВАТЬ КЛЮЧ"
+    else
+        Notify("setclipboard недоступен", COLORS.Danger)
+    end
+end)
+
+-- GET SCRIPT (copy site URL)
+GetScriptBtn.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard(SITE_URL)
+        Notify("Ссылка скопирована!", COLORS.Success)
+        GetScriptBtn.Text = "✓ ССЫЛКА СКОПИРОВАНА"
+        Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(16, 60, 40)})
+        task.wait(1.8)
+        GetScriptBtn.Text = "ПОЛУЧИТЬ СКРИПТ"
+        Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)})
     else
         Notify("setclipboard недоступен", COLORS.Danger)
     end
@@ -770,7 +829,7 @@ function BuildUI()
     hs.Size = UDim2.new(1, -60, 0, 18)
     hs.Position = UDim2.new(0, 20, 0, 36)
     hs.BackgroundTransparency = 1
-    hs.Text = "V6.0 • " .. (LP.DisplayName or "User")
+    hs.Text = "V6.2 • " .. (LP.DisplayName or "User")
     hs.TextColor3 = COLORS.Accent2
     hs.Font = Enum.Font.Gotham
     hs.TextSize = 11
@@ -877,6 +936,9 @@ function BuildUI()
             end
             if setting == "Fly" then
                 if Settings.Fly then StartFly() else StopFly() end
+            end
+            if setting == "Noclip" then
+                if Settings.Noclip then StartNoclip() else StopNoclip() end
             end
         end)
     end
@@ -1025,12 +1087,13 @@ UIS.InputBegan:Connect(function(input, gp)
     elseif input.KeyCode == Enum.KeyCode.N then
         if IsAuthenticated then
             Settings.Noclip = not Settings.Noclip
+            if Settings.Noclip then StartNoclip() else StopNoclip() end
             Notify("NOCLIP: " .. (Settings.Noclip and "ВКЛ" or "ВЫКЛ"), Settings.Noclip and COLORS.Success or COLORS.Danger)
         end
     end
 end)
 
 print("==========================================")
-print("[FONDI MM2 V6.0] READY")
+print("[FONDI MM2 V6.2] READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
