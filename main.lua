@@ -1,15 +1,14 @@
 --[[
-    FONDI MM2 V8.0 // ORION UI EDITION
-    - Aimbot для Sheriff (видимый, по RMB)
-    - Reveal Murderer (уведомление + чат)
-    - Auto-Pickup оружия
-    - Kill All (только с ножом)
-    - Fling (выброс за карту)
+    FONDI MM2 V8.1 // ORION UI (NO SAVE)
+    - Aimbot для Sheriff
+    - Reveal Murderer
+    - Auto-Pickup
+    - Kill All
+    - Fling
     - Anti-Kick уведомление
-    - Fly / Noclip / Bhop / Anti-Fling / Kill Aura / Farm
+    - Fly / Noclip / Bhop / Anti-Fling / Kill All / Farm
     - ESP / Outline / Tracers / Names / Roles
     - RU/EN
-    - UI: Orion Library
 ]]
 
 --==================================================
@@ -21,7 +20,6 @@ local UIS = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
-local StarterGui = game:GetService("StarterGui")
 
 local LP = Players.LocalPlayer
 local pg = LP:WaitForChild("PlayerGui")
@@ -148,15 +146,17 @@ local function LoadLang()
 end
 
 --==================================================
--- NOTIFY (Orion)
+-- NOTIFY
 --==================================================
 local function Notify(title, content, duration)
-    OrionLib:MakeNotification({
-        Name = tostring(title),
-        Content = tostring(content or ""),
-        Image = "rbxassetid://4483345998",
-        Time = duration or 3
-    })
+    pcall(function()
+        OrionLib:MakeNotification({
+            Name = tostring(title),
+            Content = tostring(content or ""),
+            Image = "rbxassetid://4483345998",
+            Time = duration or 3
+        })
+    end)
 end
 
 --==================================================
@@ -450,7 +450,7 @@ local function StartAntiFling()
 end
 
 --==================================================
--- AIMBOT (Sheriff)
+-- AIMBOT
 --==================================================
 local aimbotConn = nil
 local function StopAimbot()
@@ -498,7 +498,7 @@ local function StartPickup()
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and (obj.Name:lower():find("gun") or obj.Name:lower():find("revolver") or obj.Name:lower():find("dropped")) then
+            if obj:IsA("BasePart") and (obj.Name:lower():find("gun") or obj.Name:lower():find("revolver")) then
                 if (obj.Position - r.Position).Magnitude < 50 then
                     r.CFrame = CFrame.new(obj.Position + Vector3.new(0, 3, 0))
                 end
@@ -559,7 +559,7 @@ local function FlingPlayer(target)
 end
 
 --==================================================
--- FARM (Coins)
+-- FARM
 --==================================================
 local farmConn = nil
 local function StopFarm()
@@ -587,27 +587,26 @@ local function StartFarm()
 end
 
 --==================================================
--- ANTI-KICK WARNING
+-- ANTI-KICK WARNING (безопасный)
 --==================================================
-local oldKick = hookfunction or hookfunc
-if oldKick and LP.Kick then
-    pcall(function()
+pcall(function()
+    local oldKick = hookfunction or hookfunc
+    if oldKick and LP.Kick then
         oldKick(LP.Kick, function(self, msg)
-            Notify("ANTI-KICK", "Попытка кика: " .. tostring(msg), 10)
-            task.wait(0.1)
+            pcall(function() Notify("ANTI-KICK", "Kick attempt: " .. tostring(msg), 5) end)
+            task.wait(0.05)
             return LP.Kick(self, msg)
         end)
-    end)
-end
+    end
+end)
 
 --==================================================
--- BUILD UI
+-- BUILD UI (NO SAVE / NO FLAG)
 --==================================================
 local Window = OrionLib:MakeWindow({
     Name = T("menu"),
     HidePremium = false,
-    SaveConfig = true,
-    ConfigFolder = "FondiConfig",
+    SaveConfig = false,
     IntroEnabled = true,
     IntroText = "FONDI MM2",
     IntroIcon = "rbxassetid://4483345998"
@@ -621,45 +620,82 @@ local SettingsTab = Window:MakeTab({Name = "Settings", Icon = "rbxassetid://4483
 
 -- MAIN TAB
 local MainSec = MainTab:AddSection({Name = "ESP"})
-MainSec:AddToggle({Name = T("esp"), Default = false, Flag = "esp", Save = true, Callback = function(v)
+MainSec:AddToggle({Name = T("esp"), Default = false, Callback = function(v)
     Settings.ESP = v
-    if v then for _, p in ipairs(Players:GetPlayers()) do if p ~= LP then CreateESP(p) end end
-    else for p, _ in pairs(ESPObjects) do RemoveESP(p) end end
+    if v then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then CreateESP(p) end
+        end
+    else
+        for p, _ in pairs(ESPObjects) do RemoveESP(p) end
+    end
 end})
-MainSec:AddToggle({Name = T("outline"), Default = true, Flag = "outline", Save = true, Callback = function(v) Settings.Outline = v end})
-MainSec:AddToggle({Name = T("tracers"), Default = true, Flag = "tracers", Save = true, Callback = function(v) Settings.Tracers = v end})
-MainSec:AddToggle({Name = T("names"), Default = true, Flag = "names", Save = true, Callback = function(v) Settings.ShowNames = v end})
-MainSec:AddToggle({Name = T("roles"), Default = true, Flag = "roles", Save = true, Callback = function(v) Settings.ShowRoles = v end})
+MainSec:AddToggle({Name = T("outline"), Default = true, Callback = function(v) Settings.Outline = v end})
+MainSec:AddToggle({Name = T("tracers"), Default = true, Callback = function(v) Settings.Tracers = v end})
+MainSec:AddToggle({Name = T("names"), Default = true, Callback = function(v) Settings.ShowNames = v end})
+MainSec:AddToggle({Name = T("roles"), Default = true, Callback = function(v) Settings.ShowRoles = v end})
 
 local MoveSec = MainTab:AddSection({Name = "Movement"})
-MoveSec:AddToggle({Name = T("fly"), Default = false, Flag = "fly", Save = true, Callback = function(v) Settings.Fly = v; if v then StartFly() else StopFly() end end})
-MoveSec:AddSlider({Name = "Fly Speed", Min = 20, Max = 150, Default = 55, Increment = 5, Flag = "flyspeed", Save = true, Callback = function(v) Settings.FlySpeed = v end})
-MoveSec:AddToggle({Name = T("noclip"), Default = false, Flag = "noclip", Save = true, Callback = function(v) Settings.Noclip = v; if v then StartNoclip() else StopNoclip() end end})
-MoveSec:AddToggle({Name = T("bhop"), Default = false, Flag = "bhop", Save = true, Callback = function(v) Settings.Bhop = v; if v then StartBhop() else StopBhop() end end})
-MoveSec:AddToggle({Name = T("antifling"), Default = false, Flag = "antifling", Save = true, Callback = function(v) Settings.AntiFling = v; if v then StartAntiFling() else StopAntiFling() end end})
+MoveSec:AddToggle({Name = T("fly"), Default = false, Callback = function(v)
+    Settings.Fly = v
+    if v then StartFly() else StopFly() end
+end})
+MoveSec:AddSlider({Name = "Fly Speed", Min = 20, Max = 150, Default = 55, Increment = 5, Callback = function(v)
+    Settings.FlySpeed = v
+end})
+MoveSec:AddToggle({Name = T("noclip"), Default = false, Callback = function(v)
+    Settings.Noclip = v
+    if v then StartNoclip() else StopNoclip() end
+end})
+MoveSec:AddToggle({Name = T("bhop"), Default = false, Callback = function(v)
+    Settings.Bhop = v
+    if v then StartBhop() else StopBhop() end
+end})
+MoveSec:AddToggle({Name = T("antifling"), Default = false, Callback = function(v)
+    Settings.AntiFling = v
+    if v then StartAntiFling() else StopAntiFling() end
+end})
 
 -- COMBAT TAB
 local CombatSec = CombatTab:AddSection({Name = "Combat"})
-CombatSec:AddToggle({Name = T("aimbot"), Default = false, Flag = "aimbot", Save = true, Callback = function(v) Settings.Aimbot = v; if v then StartAimbot() else StopAimbot() end end})
-CombatSec:AddToggle({Name = T("killall"), Default = false, Flag = "killall", Save = true, Callback = function(v) Settings.KillAll = v; if v then StartKillAll() else StopKillAll() end end})
-CombatSec:AddSlider({Name = T("range"), Min = 5, Max = 50, Default = 15, Increment = 1, Flag = "killrange", Save = true, Callback = function(v) Settings.KillAuraRange = v end})
-CombatSec:AddToggle({Name = T("pickup"), Default = false, Flag = "pickup", Save = true, Callback = function(v) Settings.AutoPickup = v; if v then StartPickup() else StopPickup() end end})
-CombatSec:AddToggle({Name = T("reveal"), Default = false, Flag = "reveal", Save = true, Callback = function(v) Settings.RevealMurderer = v end})
+CombatSec:AddToggle({Name = T("aimbot"), Default = false, Callback = function(v)
+    Settings.Aimbot = v
+    if v then StartAimbot() else StopAimbot() end
+end})
+CombatSec:AddToggle({Name = T("killall"), Default = false, Callback = function(v)
+    Settings.KillAll = v
+    if v then StartKillAll() else StopKillAll() end
+end})
+CombatSec:AddSlider({Name = T("range"), Min = 5, Max = 50, Default = 15, Increment = 1, Callback = function(v)
+    Settings.KillAuraRange = v
+end})
+CombatSec:AddToggle({Name = T("pickup"), Default = false, Callback = function(v)
+    Settings.AutoPickup = v
+    if v then StartPickup() else StopPickup() end
+end})
+CombatSec:AddToggle({Name = T("reveal"), Default = false, Callback = function(v)
+    Settings.RevealMurderer = v
+end})
 
 local FlingSec = CombatTab:AddSection({Name = "FLING"})
 local flingDropdown = FlingSec:AddDropdown({
-    Name = T("flingTarget"), Default = "None",
+    Name = T("flingTarget"),
+    Default = "None",
     Options = {"None"},
-    Flag = "flingtarget", Save = false,
     Callback = function(v) end
 })
+
 task.spawn(function()
     while task.wait(3) do
         local opts = {"None"}
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LP then table.insert(opts, p.DisplayName) end
         end
-        pcall(function() flingDropdown:Refresh(opts, flingDropdown.Value or "None") end)
+        pcall(function()
+            if flingDropdown and flingDropdown.Refresh then
+                flingDropdown:Refresh(opts, flingDropdown.Value or "None")
+            end
+        end)
     end
 end)
 
@@ -667,9 +703,15 @@ FlingSec:AddButton({
     Name = "FLING SELECTED",
     Callback = function()
         local name = flingDropdown.Value
-        if name == "None" then Notify("FLING", "Выбери игрока", 2); return end
+        if name == "None" then
+            Notify("FLING", "Выбери игрока", 2)
+            return
+        end
         for _, p in ipairs(Players:GetPlayers()) do
-            if p.DisplayName == name then FlingPlayer(p); break end
+            if p.DisplayName == name then
+                FlingPlayer(p)
+                break
+            end
         end
     end
 })
@@ -685,11 +727,16 @@ FlingSec:AddButton({
 
 -- FARM TAB
 local FarmSec = FarmTab:AddSection({Name = "Coins"})
-FarmSec:AddToggle({Name = T("farm"), Default = false, Flag = "farm", Save = true, Callback = function(v) Settings.Farm = v; if v then StartFarm() else StopFarm() end end})
+FarmSec:AddToggle({Name = T("farm"), Default = false, Callback = function(v)
+    Settings.Farm = v
+    if v then StartFarm() else StopFarm() end
+end})
 
 -- MISC TAB
 local MiscSec = MiscTab:AddSection({Name = "Notifications"})
-MiscSec:AddToggle({Name = T("notif"), Default = true, Flag = "notif", Save = true, Callback = function(v) Settings.Notifications = v end})
+MiscSec:AddToggle({Name = T("notif"), Default = true, Callback = function(v)
+    Settings.Notifications = v
+end})
 
 -- SETTINGS TAB
 local SettingsSec = SettingsTab:AddSection({Name = "Language"})
@@ -699,11 +746,6 @@ SettingsSec:AddButton({
         Lang = (Lang == "ru") and "en" or "ru"
         SaveLang(Lang)
         Notify("LANG", "Changed to " .. Lang, 2)
-        task.wait(0.5)
-        Window:Destroy()
-        -- перезапуск всего скрипта — просто вызовем loadstring заново
-        local src = game:HttpGet("https://raw.githubusercontent.com/p1shenak/main.lua/refs/heads/main/main.lua")
-        loadstring(src)()
     end
 })
 
@@ -734,10 +776,11 @@ UIS.InputBegan:Connect(function(input, gp)
 end)
 
 --==================================================
--- AUTOLOGIN
+-- AUTOLOGIN + KEY PROMPT
 --==================================================
 task.spawn(function()
     task.wait(1.5)
+
     local saved = LoadKey()
     if saved then
         local valid = ValidateKey(saved)
@@ -749,16 +792,17 @@ task.spawn(function()
         ClearKey()
     end
 
-    -- Если нет ключа — показываем окно ввода через Orion (или можно обычным GUI)
-    -- Поскольку Orion не умеет в prompt, используем простой GUI
+    -- Key prompt
     local sg = Instance.new("ScreenGui", pg)
     sg.Name = "FondiKeyPrompt"
     sg.ResetOnSpawn = false
+    sg.DisplayOrder = 100
 
     local frame = Instance.new("Frame", sg)
     frame.Size = UDim2.new(0, 400, 0, 260)
     frame.Position = UDim2.new(0.5, -200, 0.5, -130)
     frame.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
+    frame.BorderSizePixel = 0
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 16)
 
     local stroke = Instance.new("UIStroke", frame)
@@ -783,6 +827,7 @@ task.spawn(function()
     box.Font = Enum.Font.Code
     box.TextSize = 14
     box.ClearTextOnFocus = false
+    box.BorderSizePixel = 0
     Instance.new("UICorner", box).CornerRadius = UDim.new(0, 10)
 
     local btn = Instance.new("TextButton", frame)
@@ -793,6 +838,7 @@ task.spawn(function()
     btn.TextColor3 = Color3.new(1,1,1)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
+    btn.BorderSizePixel = 0
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
 
     local genBtn = Instance.new("TextButton", frame)
@@ -803,6 +849,7 @@ task.spawn(function()
     genBtn.TextColor3 = Color3.new(1,1,1)
     genBtn.Font = Enum.Font.GothamBold
     genBtn.TextSize = 13
+    genBtn.BorderSizePixel = 0
     Instance.new("UICorner", genBtn).CornerRadius = UDim.new(0, 10)
 
     btn.MouseButton1Click:Connect(function()
@@ -825,13 +872,16 @@ task.spawn(function()
         genBtn.Text = "..."
         task.spawn(function()
             local key = GenerateKeyRemote("1d")
-            if key then box.Text = key; Notify("KEY", T("genTitle"), 2) end
+            if key then
+                box.Text = key
+                Notify("KEY", T("genTitle"), 2)
+            end
             genBtn.Text = T("genKey")
         end)
     end)
 end)
 
 print("==========================================")
-print("[FONDI MM2 V8.0] ORION UI READY")
+print("[FONDI MM2 V8.1] ORION UI READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
