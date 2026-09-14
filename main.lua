@@ -1,9 +1,9 @@
 --[[
-    FONDI MM2 V6.3 // FLY & NOCLIP FIXED
+    FONDI MM2 V6.4 // AUTO-SESSION
     - Fly через CFrame + Velocity lock (не падает)
     - Noclip через CanCollide каждый кадр
+    - Автосохранение ключа (writefile/readfile)
     - Online key auth через Vercel API
-    - Кнопка "Получить скрипт" (копирует ссылку сайта)
     - ESP / Outline / Tracers / Names / Roles
     - Hotkeys: [L] menu, [F] Fly, [N] Noclip
 ]]
@@ -27,6 +27,7 @@ local pg = LP:WaitForChild("PlayerGui")
 local AUTH_URL = "https://fondi-mm-2-auntification.vercel.app/api/validate"
 local GENERATE_URL = "https://fondi-mm-2-auntification.vercel.app/api/generate"
 local SITE_URL = "https://fondi-mm-2-auntification.vercel.app/"
+local KEY_FILE = "fondi_key.txt"
 
 --==================================================
 -- SETTINGS
@@ -128,6 +129,38 @@ local function GenerateKeyRemote(duration)
     if not data then return nil, err end
     if data.error then return nil, data.error end
     return data.key, data
+end
+
+--==================================================
+-- SESSION
+--==================================================
+local function SaveKey(key)
+    pcall(function()
+        if writefile then
+            writefile(KEY_FILE, key)
+        end
+    end)
+end
+
+local function LoadKey()
+    local ok, content = pcall(function()
+        if readfile and isfile and isfile(KEY_FILE) then
+            return readfile(KEY_FILE)
+        end
+        return nil
+    end)
+    if ok and content and content ~= "" then
+        return content
+    end
+    return nil
+end
+
+local function ClearKey()
+    pcall(function()
+        if delfile and isfile and isfile(KEY_FILE) then
+            delfile(KEY_FILE)
+        end
+    end)
 end
 
 --==================================================
@@ -416,7 +449,7 @@ task.spawn(function()
 end)
 
 --==================================================
--- NOCLIP (CanCollide every frame)
+-- NOCLIP
 --==================================================
 local noclipConnection = nil
 
@@ -452,7 +485,7 @@ local function StartNoclip()
 end
 
 --==================================================
--- FLY (CFrame + Velocity lock — не падает)
+-- FLY
 --==================================================
 local flyConnection = nil
 local flyActive = false
@@ -484,10 +517,7 @@ local function StartFly()
         local h = c:FindFirstChildOfClass("Humanoid")
         if not r or not h then return end
 
-        -- Отключаем физику падения и гравитацию
         h.PlatformStand = true
-
-        -- Обнуляем скорость каждый кадр — гравитация не тянет вниз
         r.Velocity = Vector3.zero
         r.RotVelocity = Vector3.zero
 
@@ -556,7 +586,7 @@ local keySub = Instance.new("TextLabel", KeyFrame)
 keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 72)
 keySub.BackgroundTransparency = 1
-keySub.Text = "V6.3 • FLY & NOCLIP FIXED"
+keySub.Text = "V6.4 • AUTO-SESSION"
 keySub.TextColor3 = COLORS.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -704,6 +734,25 @@ GetScriptBtn.MouseLeave:Connect(function() Tween(GetScriptBtn, 0.2, {BackgroundC
 KeyFrame.Position = UDim2.new(0.5, -200, 0.5, -225)
 Tween(KeyFrame, 0.5, {Position = UDim2.new(0.5, -200, 0.5, -265)}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
+local function CloseKeyGui()
+    Tween(KeyFrame, 0.3, {
+        Position = UDim2.new(0.5, -200, 0.5, -225),
+        BackgroundTransparency = 1
+    }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    for _, obj in ipairs(KeyFrame:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+            Tween(obj, 0.3, {TextTransparency = 1})
+        elseif obj:IsA("Frame") and obj ~= KeyFrame then
+            Tween(obj, 0.3, {BackgroundTransparency = 1})
+        elseif obj:IsA("UIStroke") then
+            Tween(obj, 0.3, {Transparency = 1})
+        end
+    end
+    task.wait(0.4)
+    KeyGui:Destroy()
+    BuildUI()
+end
+
 -- AUTH
 ActivateBtn.MouseButton1Click:Connect(function()
     if KeyBox.Text == "" then Notify("Введите ключ", COLORS.Warning); return end
@@ -713,20 +762,9 @@ ActivateBtn.MouseButton1Click:Connect(function()
     local valid, info = ValidateKey(KeyBox.Text)
     if valid then
         IsAuthenticated = true
+        SaveKey(KeyBox.Text)
         Notify("ДОСТУП РАЗРЕШЁН", COLORS.Success)
-        Tween(KeyFrame, 0.3, {Position = UDim2.new(0.5, -200, 0.5, -225), BackgroundTransparency = 1}, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        for _, obj in ipairs(KeyFrame:GetDescendants()) do
-            if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-                Tween(obj, 0.3, {TextTransparency = 1})
-            elseif obj:IsA("Frame") and obj ~= KeyFrame then
-                Tween(obj, 0.3, {BackgroundTransparency = 1})
-            elseif obj:IsA("UIStroke") then
-                Tween(obj, 0.3, {Transparency = 1})
-            end
-        end
-        task.wait(0.4)
-        KeyGui:Destroy()
-        BuildUI()
+        CloseKeyGui()
     else
         KeyBox.Text = ""
         KeyBox.PlaceholderText = "НЕВЕРНЫЙ КЛЮЧ"
@@ -778,7 +816,7 @@ CopyBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- GET SCRIPT (copy site URL)
+-- GET SCRIPT
 GetScriptBtn.MouseButton1Click:Connect(function()
     if setclipboard then
         setclipboard(SITE_URL)
@@ -790,6 +828,31 @@ GetScriptBtn.MouseButton1Click:Connect(function()
         Tween(GetScriptBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(28, 28, 42)})
     else
         Notify("setclipboard недоступен", COLORS.Danger)
+    end
+end)
+
+-- AUTO-LOGIN
+task.spawn(function()
+    task.wait(1.5)
+    local savedKey = LoadKey()
+    if not savedKey then return end
+
+    KeyBox.Text = savedKey
+    ActivateBtn.Text = "АВТОВХОД..."
+    ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
+
+    local valid, info = ValidateKey(savedKey)
+    if valid then
+        IsAuthenticated = true
+        Notify("АВТОВХОД: ДОСТУП РАЗРЕШЁН", COLORS.Success)
+        CloseKeyGui()
+    else
+        ClearKey()
+        KeyBox.Text = ""
+        KeyBox.PlaceholderText = "СЕССИЯ ИСТЕКЛА"
+        ActivateBtn.Text = "АКТИВИРОВАТЬ"
+        ActivateBtn.BackgroundColor3 = COLORS.Accent
+        Notify("Сессия истекла, введите ключ", COLORS.Warning)
     end
 end)
 
@@ -838,7 +901,7 @@ function BuildUI()
     hs.Size = UDim2.new(1, -60, 0, 18)
     hs.Position = UDim2.new(0, 20, 0, 36)
     hs.BackgroundTransparency = 1
-    hs.Text = "V6.3 • " .. (LP.DisplayName or "User")
+    hs.Text = "V6.4 • " .. (LP.DisplayName or "User")
     hs.TextColor3 = COLORS.Accent2
     hs.Font = Enum.Font.Gotham
     hs.TextSize = 11
@@ -1103,6 +1166,6 @@ UIS.InputBegan:Connect(function(input, gp)
 end)
 
 print("==========================================")
-print("[FONDI MM2 V6.3] READY")
+print("[FONDI MM2 V6.4] READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
