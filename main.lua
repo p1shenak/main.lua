@@ -1,11 +1,11 @@
 --[[
-    FONDI MM2 V11.1 // VISUALS EDITION
+    FONDI MM2 V11.2 // VISUALS EDITION
     - Hitmarker / Kill Effect / Damage Indicator
     - Watermark / FPS Graph / Custom Crosshair
     - Kill Notification / Rainbow Trail
     - Kill Sound (asset 136998941171548)
     - Все прошлые функции
-    - FIX: Kill All / Auto-Pickup / Fling All
+    - FIX: Kill All / Auto-Pickup / Fling (spin-fling метод)
 ]]
 
 local Players = game:GetService("Players")
@@ -24,6 +24,8 @@ local GENERATE_URL = "https://fondi-mm-2-auntification.vercel.app/api/generate"
 local KEY_FILE = "fondi_key.txt"
 local LANG_FILE = "fondi_lang.txt"
 
+local VERSION = "V11.2"
+
 local IsAuthenticated = false
 local Lang = "ru"
 
@@ -35,7 +37,9 @@ local Settings = {
     -- Visuals
     KillSound=true, Hitmarker=true, DamageIndicator=true,
     Watermark=true, FpsGraph=true, Crosshair=true,
-    KillEffect=true, KillNotif=true, RainbowTrail=false
+    KillEffect=true, KillNotif=true, RainbowTrail=false,
+    -- Fling
+    FlingSpeed=350, FlingSpin=600
 }
 
 local C = {
@@ -67,6 +71,7 @@ local I18N = {
         killall="Kill All", pickup="Auto-Pickup", reveal="Reveal Murderer",
         range="Радиус", farm="Farm", notif="Уведомления",
         flingTitle="FLING", flingBtn="ВЫБРОСИТЬ", flingAll="ВЫБРОСИТЬ ВСЕХ",
+        flingSpeed="Скорость", flingSpin="Вращение",
         playerList="СПИСОК ИГРОКОВ",
         keyInput="Введите ключ", keyInvalid="Неверный ключ",
         activate="АКТИВИРОВАТЬ", checking="ПРОВЕРКА...", autologin="АВТОВХОД...",
@@ -95,6 +100,7 @@ local I18N = {
         killall="Kill All", pickup="Auto-Pickup", reveal="Reveal Murderer",
         range="Range", farm="Farm", notif="Notifications",
         flingTitle="FLING", flingBtn="FLING", flingAll="FLING ALL",
+        flingSpeed="Speed", flingSpin="Spin",
         playerList="PLAYER LIST",
         keyInput="Enter key", keyInvalid="Invalid key",
         activate="ACTIVATE", checking="CHECKING...", autologin="AUTO-LOGIN...",
@@ -355,7 +361,7 @@ local function RoleColor(r) return C[r] or C.Innocent end
 --==================================================
 -- KILL TRACKER
 --==================================================
-local hitTimestamps = {}  -- [player] = os.clock()
+local hitTimestamps = {}
 
 local function RegisterHit(player)
     if player and player ~= LP then
@@ -550,7 +556,6 @@ Players.PlayerRemoving:Connect(function(p)
     RemoveESP(p); DisconnectPlayer(p); lastRoles[p] = nil; hitTimestamps[p] = nil
 end)
 
--- Reattach died listener for existing humanoids
 task.spawn(function()
     task.wait(2)
     for _, p in ipairs(Players:GetPlayers()) do
@@ -649,7 +654,7 @@ wmLabel.Size = UDim2.new(1, -12, 1, 0)
 wmLabel.Position = UDim2.new(0, 6, 0, 0)
 wmLabel.BackgroundTransparency = 1
 wmLabel.ZIndex = 101
-wmLabel.Text = "FONDI MM2 v11.0 | 60 FPS | 0 ms"
+wmLabel.Text = "FONDI MM2 " .. VERSION .. " | 60 FPS | 0 ms"
 wmLabel.TextColor3 = C.Text
 wmLabel.Font = Enum.Font.GothamBold
 wmLabel.TextSize = 11
@@ -879,18 +884,16 @@ end
 --==================================================
 task.spawn(function()
     while task.wait(0.5) do
-        -- Watermark
         if Settings.Watermark then
             watermark.Visible = true
             local fps = math.floor(1 / RunService.RenderStepped:Wait())
             local ping = 0
             pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-            wmLabel.Text = string.format("FONDI MM2 v11.0 | %d FPS | %d ms", fps, ping)
+            wmLabel.Text = string.format("FONDI MM2 " .. VERSION .. " | %d FPS | %d ms", fps, ping)
         else
             watermark.Visible = false
         end
 
-        -- FPS Graph
         if Settings.FpsGraph then
             fpsGraphBg.Visible = true
 
@@ -918,10 +921,8 @@ task.spawn(function()
             fpsGraphBg.Visible = false
         end
 
-        -- Crosshair
         crosshair.Visible = Settings.Crosshair
 
-        -- Trail
         if Settings.RainbowTrail then
             if #trailAttachments == 0 then
                 CreateTrail()
@@ -934,7 +935,6 @@ task.spawn(function()
     end
 end)
 
--- Re-attach trail on respawn
 LP.CharacterAdded:Connect(function()
     task.wait(1)
     if Settings.RainbowTrail then CreateTrail() end
@@ -1083,7 +1083,7 @@ local function StartAimbot()
 end
 
 --==================================================
--- AUTO-PICKUP  (FIXED)
+-- AUTO-PICKUP
 --==================================================
 local pickupConnection = nil
 local function StopPickup()
@@ -1099,7 +1099,6 @@ local function StartPickup()
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
 
-        -- Ищем только в корне workspace (без GetDescendants — иначе лаги)
         for _, obj in ipairs(workspace:GetChildren()) do
             local targetPart = nil
 
@@ -1119,7 +1118,6 @@ local function StartPickup()
             if targetPart then
                 local dist = (targetPart.Position - r.Position).Magnitude
                 if dist < 120 then
-                    -- Телепортируемся вплотную, чтобы сработал Touch-детект
                     r.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, 3, 0))
                     return
                 end
@@ -1129,7 +1127,7 @@ local function StartPickup()
 end
 
 --==================================================
--- KILL ALL  (FIXED)
+-- KILL ALL
 --==================================================
 local killAllConnection = nil
 local lastKillTime = 0
@@ -1153,7 +1151,6 @@ local function StartKillAll()
     StopKillAll()
     killAllConnection = RunService.Heartbeat:Connect(function()
         if not IsAuthenticated or not Settings.KillAll then return end
-        -- Ограничение по времени: не чаще 1 удара в 0.35 сек
         if os.clock() - lastKillTime < 0.35 then return end
 
         local c = LP.Character
@@ -1165,7 +1162,6 @@ local function StartKillAll()
         local w = GetWeapon()
         if not w then return end
 
-        -- Ищем ближайшего живого игрока
         local target, targetDist = nil, Settings.KillAuraRange
         for _, pl in ipairs(Players:GetPlayers()) do
             if pl ~= LP and pl.Character then
@@ -1181,11 +1177,9 @@ local function StartKillAll()
         if not target then return end
         local tr = target.Character.HumanoidRootPart
 
-        -- Поворачиваемся к цели и телепортируемся вплотную
         r.CFrame = CFrame.new(tr.Position - tr.CFrame.LookVector * 2 + Vector3.new(0, 1, 0),
                               Vector3.new(tr.Position.X, r.Position.Y, tr.Position.Z))
 
-        -- Активируем оружие 2 раза для надёжности
         pcall(function() w:Activate() end)
         task.wait(0.03)
         pcall(function() w:Activate() end)
@@ -1197,48 +1191,111 @@ local function StartKillAll()
 end
 
 --==================================================
--- FLING  (FIXED)
+-- FLING (SPIN-FLING METHOD)
+-- Читер резко разгоняется и крутится вокруг жертвы.
+-- При столкновении физика Roblox передаёт импульс жертве.
 --==================================================
-local function FlingPlayer(target)
+local flingActive = false
+local flingConnection = nil
+local flingTarget = nil
+
+local function StopFling()
+    flingActive = false
+    flingTarget = nil
+    if flingConnection then
+        flingConnection:Disconnect()
+        flingConnection = nil
+    end
+    local char = LP.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.PlatformStand = false
+            hum.AutoRotate = true
+        end
+    end
+end
+
+local function StartFling(target)
+    StopFling()
     if not target or not target.Character then return end
-    local tr = target.Character:FindFirstChild("HumanoidRootPart")
-    if not tr then return end
 
-    -- 1) Забираем network ownership у сервера
-    pcall(function()
-        tr:SetNetworkOwner(LP)
+    flingTarget = target
+    flingActive = true
+
+    flingConnection = RunService.Heartbeat:Connect(function(dt)
+        if not flingActive or not flingTarget then
+            StopFling()
+            return
+        end
+
+        local myChar = LP.Character
+        if not myChar then StopFling() return end
+        local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+        local myHum = myChar:FindFirstChildOfClass("Humanoid")
+        if not myRoot or not myHum then StopFling() return end
+
+        local tChar = flingTarget.Character
+        if not tChar then StopFling() return end
+        local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+        if not tRoot then StopFling() return end
+
+        -- Отключаем обычную физику гуманоида, чтобы скорость не сбрасывалась
+        myHum.PlatformStand = true
+        myHum.AutoRotate = false
+
+        local dir = (tRoot.Position - myRoot.Position)
+        local dist = dir.Magnitude
+        if dist < 0.01 then
+            dir = Vector3.new(1, 0, 0)
+        else
+            dir = dir.Unit
+        end
+
+        -- 1) Разгон в сторону жертвы
+        myRoot.AssemblyLinearVelocity = dir * Settings.FlingSpeed
+
+        -- 2) Если мы далеко — телепортируемся вплотную (2 стада)
+        if dist > 5 then
+            myRoot.CFrame = CFrame.new(tRoot.Position - dir * 2 + Vector3.new(0, 1, 0),
+                                       tRoot.Position)
+        end
+
+        -- 3) Огромная угловая скорость — это и передаёт импульс
+        myRoot.AssemblyAngularVelocity = Vector3.new(
+            Settings.FlingSpin,
+            Settings.FlingSpin,
+            Settings.FlingSpin
+        )
+
+        -- 4) Микротолчки, чтобы физика не «успокаивалась»
+        myRoot.AssemblyLinearVelocity = myRoot.AssemblyLinearVelocity + Vector3.new(
+            math.random(-30, 30),
+            math.random(-30, 30),
+            math.random(-30, 30)
+        )
     end)
 
-    task.wait(0.05)
-
-    -- 2) Прямое воздействие через Velocity (работает при ownership)
-    pcall(function()
-        tr.Velocity = Vector3.new(0, 9999, 0)
-        tr.RotVelocity = Vector3.new(99999, 99999, 99999)
-    end)
-
-    -- 3) Дополнительно — BodyAngularVelocity (в современном Roblox надёжнее)
-    local bav = Instance.new("BodyAngularVelocity")
-    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bav.AngularVelocity = Vector3.new(9999, 9999, 9999)
-    bav.P = 1250
-    bav.Parent = tr
-
-    -- 4) BodyVelocity как страховка
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(0, 9999, 0)
-    bv.P = 1250
-    bv.Parent = tr
-
-    -- Чистим через 0.6 сек
-    task.delay(0.6, function()
-        pcall(function() bv:Destroy() end)
-        pcall(function() bav:Destroy() end)
-        pcall(function() tr:SetNetworkOwnershipAuto() end)
+    -- Авто-стоп через 6 секунд, чтобы не залипнуть в PlatformStand
+    task.delay(6, function()
+        if flingActive and flingTarget == target then
+            StopFling()
+        end
     end)
 
     Notify("FLING → " .. target.DisplayName, C.Pink, 2)
+end
+
+local function FlingAll()
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LP and pl.Character then
+            task.spawn(function()
+                StartFling(pl)
+                task.wait(1.2)
+                StopFling()
+            end)
+        end
+    end
 end
 
 --==================================================
@@ -1354,7 +1411,7 @@ local function ShowLoadingScreen(callback)
     logo2.Position = UDim2.new(0, 0, 0.4, -5)
     logo2.BackgroundTransparency = 1
     logo2.ZIndex = 5
-    logo2.Text = "MM2 V11.0"
+    logo2.Text = "MM2 " .. VERSION
     logo2.TextColor3 = C.Accent2
     logo2.Font = Enum.Font.GothamBold
     logo2.TextSize = 16
@@ -1471,7 +1528,7 @@ function BuildUI()
     subTitle.Position = UDim2.new(0, 24, 0, 42)
     subTitle.BackgroundTransparency = 1
     subTitle.ZIndex = 12
-    subTitle.Text = "V11.0 • " .. (LP.DisplayName or "User")
+    subTitle.Text = VERSION .. " • " .. (LP.DisplayName or "User")
     subTitle.TextColor3 = C.Accent2
     subTitle.Font = Enum.Font.Gotham
     subTitle.TextSize = 11
@@ -1844,6 +1901,14 @@ function BuildUI()
     flingTitle.TextSize = 11
     flingTitle.TextXAlignment = Enum.TextXAlignment.Left
 
+    -- Слайдеры флинга
+    CreateSlider(tabContents["combat"], T("flingSpeed"), 100, 800, Settings.FlingSpeed, C.Danger, function(v)
+        Settings.FlingSpeed = v
+    end)
+    CreateSlider(tabContents["combat"], T("flingSpin"), 100, 1500, Settings.FlingSpin, C.Pink, function(v)
+        Settings.FlingSpin = v
+    end)
+
     local selectedFlingTarget = nil
     local playerBtn = Instance.new("TextButton", tabContents["combat"])
     playerBtn.Size = UDim2.new(1, -5, 0, 42)
@@ -1925,7 +1990,7 @@ function BuildUI()
         if not selectedFlingTarget then return end
         PlayClick()
         BurstFrom(flingBtn)
-        FlingPlayer(selectedFlingTarget)
+        StartFling(selectedFlingTarget)
     end)
 
     local flingAllBtn = Instance.new("TextButton", tabContents["combat"])
@@ -1942,9 +2007,7 @@ function BuildUI()
     flingAllBtn.MouseButton1Click:Connect(function()
         PlayClick()
         BurstFrom(flingAllBtn)
-        for _, pl in ipairs(Players:GetPlayers()) do
-            if pl ~= LP then FlingPlayer(pl) end
-        end
+        FlingAll()
     end)
 
     -- VISUAL TAB
@@ -2111,7 +2174,7 @@ keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 78)
 keySub.BackgroundTransparency = 1
 keySub.ZIndex = 15
-keySub.Text = "V11.0 • VISUALS"
+keySub.Text = VERSION .. " • VISUALS"
 keySub.TextColor3 = C.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -2380,7 +2443,7 @@ do
 end
 
 print("==========================================")
-print("[FONDI MM2 V11.1] VISUALS READY")
+print("[FONDI MM2 " .. VERSION .. "] VISUALS READY")
 print("[FONDI MM2] Press L to toggle menu")
-print("[FONDI MM2] FIXED: KillAll / AutoPickup / FlingAll")
+print("[FONDI MM2] FIXED: KillAll / AutoPickup / Fling (spin-fling)")
 print("==========================================")
