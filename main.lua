@@ -1,10 +1,11 @@
 --[[
-    FONDI MM2 V11.0 // VISUALS EDITION
+    FONDI MM2 V11.1 // VISUALS EDITION
     - Hitmarker / Kill Effect / Damage Indicator
     - Watermark / FPS Graph / Custom Crosshair
     - Kill Notification / Rainbow Trail
     - Kill Sound (asset 136998941171548)
     - Все прошлые функции
+    - FIX: Kill All / Auto-Pickup / Fling All
 ]]
 
 local Players = game:GetService("Players")
@@ -482,13 +483,10 @@ end
 local function OnPlayerDied(player)
     if player == LP then return end
     if WasOurKill(player) then
-        -- Kill sound
         PlayKillSound()
-        -- Kill notification
         if Settings.KillNotif then
             KillNotification(player.DisplayName)
         end
-        -- Kill effect
         if Settings.KillEffect then
             ShowKillEffect()
         end
@@ -737,7 +735,7 @@ killNotifLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 killNotif.Visible = false
 
-local function KillNotification(victimName)
+function KillNotification(victimName)
     killNotifLabel.Text = "☠  YOU KILLED  " .. victimName
     killNotif.Visible = true
     killNotif.Position = UDim2.new(0.5, -160, 0, -70)
@@ -771,7 +769,7 @@ killEffect.BorderSizePixel = 0
 killEffect.ZIndex = 250
 Corner(killEffect, 100)
 
-local function ShowKillEffect()
+function ShowKillEffect()
     killEffect.BackgroundTransparency = 0.6
     killEffect.Size = UDim2.new(0, 50, 0, 50)
     killEffect.Position = UDim2.new(0.5, -25, 0.5, -25)
@@ -784,7 +782,7 @@ local function ShowKillEffect()
 end
 
 -- Hitmarker function
-local function ShowHitmarker()
+function ShowHitmarker()
     if not Settings.Hitmarker then return end
     hitmarker.Visible = true
     hitmarker.Size = UDim2.new(0, 30, 0, 30)
@@ -896,12 +894,10 @@ task.spawn(function()
         if Settings.FpsGraph then
             fpsGraphBg.Visible = true
 
-            -- Sample fps
             local fps = math.floor(1 / RunService.RenderStepped:Wait())
             table.remove(fpsValues, 1)
             table.insert(fpsValues, fps)
 
-            -- Redraw bars
             for _, c in ipairs(fpsGraph:GetChildren()) do
                 if c:IsA("Frame") then c:Destroy() end
             end
@@ -1087,12 +1083,13 @@ local function StartAimbot()
 end
 
 --==================================================
--- PICKUP
+-- AUTO-PICKUP  (FIXED)
 --==================================================
 local pickupConnection = nil
 local function StopPickup()
     if pickupConnection then pickupConnection:Disconnect(); pickupConnection = nil end
 end
+
 local function StartPickup()
     StopPickup()
     pickupConnection = RunService.Heartbeat:Connect(function()
@@ -1101,10 +1098,30 @@ local function StartPickup()
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and (obj.Name:lower():find("gun") or obj.Name:lower():find("revolver")) then
-                if (obj.Position - r.Position).Magnitude < 50 then
-                    r.CFrame = CFrame.new(obj.Position + Vector3.new(0, 3, 0))
+
+        -- Ищем только в корне workspace (без GetDescendants — иначе лаги)
+        for _, obj in ipairs(workspace:GetChildren()) do
+            local targetPart = nil
+
+            if obj:IsA("Tool") then
+                local n = obj.Name:lower()
+                if n:find("gun") or n:find("revolver") or n:find("knife") then
+                    targetPart = obj:FindFirstChild("Handle")
+                end
+            elseif obj:IsA("Model") then
+                local n = obj.Name:lower()
+                if n:find("gun") or n:find("revolver") or n:find("knife") then
+                    targetPart = obj:FindFirstChild("Handle")
+                        or obj:FindFirstChildWhichIsA("BasePart")
+                end
+            end
+
+            if targetPart then
+                local dist = (targetPart.Position - r.Position).Magnitude
+                if dist < 120 then
+                    -- Телепортируемся вплотную, чтобы сработал Touch-детект
+                    r.CFrame = CFrame.new(targetPart.Position + Vector3.new(0, 3, 0))
+                    return
                 end
             end
         end
@@ -1112,53 +1129,115 @@ local function StartPickup()
 end
 
 --==================================================
--- KILL ALL
+-- KILL ALL  (FIXED)
 --==================================================
 local killAllConnection = nil
+local lastKillTime = 0
+
 local function GetWeapon()
     local c = LP.Character
     if not c then return nil end
     for _, t in ipairs(c:GetChildren()) do
-        if t:IsA("Tool") and (t.Name == "Knife" or t.Name == "Gun" or t.Name == "Revolver") then return t end
+        if t:IsA("Tool") and (t.Name == "Knife" or t.Name == "Gun" or t.Name == "Revolver") then
+            return t
+        end
     end
+    return nil
 end
+
 local function StopKillAll()
     if killAllConnection then killAllConnection:Disconnect(); killAllConnection = nil end
 end
+
 local function StartKillAll()
     StopKillAll()
     killAllConnection = RunService.Heartbeat:Connect(function()
         if not IsAuthenticated or not Settings.KillAll then return end
+        -- Ограничение по времени: не чаще 1 удара в 0.35 сек
+        if os.clock() - lastKillTime < 0.35 then return end
+
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
+        local hum = c:FindFirstChildOfClass("Humanoid")
+        if not r or not hum then return end
+
         local w = GetWeapon()
-        if not r or not w then return end
+        if not w then return end
+
+        -- Ищем ближайшего живого игрока
+        local target, targetDist = nil, Settings.KillAuraRange
         for _, pl in ipairs(Players:GetPlayers()) do
             if pl ~= LP and pl.Character then
                 local tr = pl.Character:FindFirstChild("HumanoidRootPart")
-                if tr and (tr.Position - r.Position).Magnitude < Settings.KillAuraRange then
-                    r.CFrame = CFrame.new(r.Position, Vector3.new(tr.Position.X, r.Position.Y, tr.Position.Z))
-                    pcall(function() w:Activate() end)
-                    RegisterHit(pl)
-                    ShowHitmarker()
+                local th = pl.Character:FindFirstChildOfClass("Humanoid")
+                if tr and th and th.Health > 0 then
+                    local d = (tr.Position - r.Position).Magnitude
+                    if d < targetDist then targetDist = d; target = pl end
                 end
             end
         end
+
+        if not target then return end
+        local tr = target.Character.HumanoidRootPart
+
+        -- Поворачиваемся к цели и телепортируемся вплотную
+        r.CFrame = CFrame.new(tr.Position - tr.CFrame.LookVector * 2 + Vector3.new(0, 1, 0),
+                              Vector3.new(tr.Position.X, r.Position.Y, tr.Position.Z))
+
+        -- Активируем оружие 2 раза для надёжности
+        pcall(function() w:Activate() end)
+        task.wait(0.03)
+        pcall(function() w:Activate() end)
+
+        RegisterHit(target)
+        ShowHitmarker()
+        lastKillTime = os.clock()
     end)
 end
 
 --==================================================
--- FLING
+-- FLING  (FIXED)
 --==================================================
 local function FlingPlayer(target)
     if not target or not target.Character then return end
     local tr = target.Character:FindFirstChild("HumanoidRootPart")
     if not tr then return end
-    local bv = Instance.new("BodyVelocity", tr)
-    bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-    bv.Velocity = Vector3.new(99999, 99999, 99999)
-    task.delay(0.15, function() pcall(function() bv:Destroy() end) end)
+
+    -- 1) Забираем network ownership у сервера
+    pcall(function()
+        tr:SetNetworkOwner(LP)
+    end)
+
+    task.wait(0.05)
+
+    -- 2) Прямое воздействие через Velocity (работает при ownership)
+    pcall(function()
+        tr.Velocity = Vector3.new(0, 9999, 0)
+        tr.RotVelocity = Vector3.new(99999, 99999, 99999)
+    end)
+
+    -- 3) Дополнительно — BodyAngularVelocity (в современном Roblox надёжнее)
+    local bav = Instance.new("BodyAngularVelocity")
+    bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bav.AngularVelocity = Vector3.new(9999, 9999, 9999)
+    bav.P = 1250
+    bav.Parent = tr
+
+    -- 4) BodyVelocity как страховка
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bv.Velocity = Vector3.new(0, 9999, 0)
+    bv.P = 1250
+    bv.Parent = tr
+
+    -- Чистим через 0.6 сек
+    task.delay(0.6, function()
+        pcall(function() bv:Destroy() end)
+        pcall(function() bav:Destroy() end)
+        pcall(function() tr:SetNetworkOwnershipAuto() end)
+    end)
+
     Notify("FLING → " .. target.DisplayName, C.Pink, 2)
 end
 
@@ -1212,10 +1291,8 @@ task.spawn(function()
         if not char then continue end
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum and hum.Health < (hum:GetAttribute("FondiLastHP") or hum.MaxHealth) then
-            -- Damage taken
             local lastHP = hum:GetAttribute("FondiLastHP") or hum.MaxHealth
             if hum.Health < lastHP and Settings.DamageIndicator then
-                -- Random angle since we can't know exact source
                 ShowDamageDirection(math.random() * math.pi * 2)
             end
         end
@@ -2303,6 +2380,7 @@ do
 end
 
 print("==========================================")
-print("[FONDI MM2 V11.0] VISUALS READY")
+print("[FONDI MM2 V11.1] VISUALS READY")
 print("[FONDI MM2] Press L to toggle menu")
+print("[FONDI MM2] FIXED: KillAll / AutoPickup / FlingAll")
 print("==========================================")
