@@ -1,11 +1,15 @@
 --[[
-    FONDI MM2 V11.2 // VISUALS EDITION
-    - Hitmarker / Kill Effect / Damage Indicator
-    - Watermark / FPS Graph / Custom Crosshair
-    - Kill Notification / Rainbow Trail
-    - Kill Sound (asset 136998941171548)
-    - Все прошлые функции
-    - FIX: Kill All / Auto-Pickup / Fling (spin-fling метод)
+    FONDI MM2 V11.3 // NETWORK EDITION
+    - Fix Fling: prediction + попытка SetNetworkOwner
+    - Silent Aim (namecall hook)
+    - Radar / Minimap
+    - Item ESP (Knife/Gun/Coins)
+    - Kill Feed
+    - Config Save/Load
+    - Fix Damage Indicator (реальное направление)
+    - Fix Anti-Fling threshold
+    - Fix FlingAll (массив флингов)
+    - Все фичи V11.2 сохранены
 ]]
 
 local Players = game:GetService("Players")
@@ -15,6 +19,7 @@ local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local SoundService = game:GetService("SoundService")
 local Stats = game:GetService("Stats")
+local Workspace = game:GetService("Workspace")
 
 local LP = Players.LocalPlayer
 local pg = LP:WaitForChild("PlayerGui")
@@ -23,24 +28,27 @@ local AUTH_URL = "https://fondi-mm-2-auntification.vercel.app/api/validate"
 local GENERATE_URL = "https://fondi-mm-2-auntification.vercel.app/api/generate"
 local KEY_FILE = "fondi_key.txt"
 local LANG_FILE = "fondi_lang.txt"
+local CONFIG_FILE = "fondi_config.json"
 
-local VERSION = "V11.2"
+local VERSION = "V11.3"
 
 local IsAuthenticated = false
 local Lang = "ru"
 
-local Settings = {
+local DefaultSettings = {
     ESP=false, Outline=true, Tracers=true, ShowNames=true, ShowRoles=true,
     Fly=false, Noclip=false, Bhop=false, AntiFling=false, FlySpeed=55,
-    Aimbot=false, RevealMurderer=false, AutoPickup=false,
+    Aimbot=false, SilentAim=false, RevealMurderer=false, AutoPickup=false,
     KillAll=false, KillAuraRange=15, Farm=false, Notifications=true,
-    -- Visuals
     KillSound=true, Hitmarker=true, DamageIndicator=true,
     Watermark=true, FpsGraph=true, Crosshair=true,
     KillEffect=true, KillNotif=true, RainbowTrail=false,
-    -- Fling
-    FlingSpeed=350, FlingSpin=600
+    Radar=false, ItemESP=false, KillFeed=true,
+    FlingSpeed=350, FlingSpin=600,
+    FlingUseNetworkOwner=true, FlingPrediction=true
 }
+local Settings = {}
+for k, v in pairs(DefaultSettings) do Settings[k] = v end
 
 local C = {
     Murderer = Color3.fromRGB(255, 60, 60),
@@ -68,10 +76,11 @@ local I18N = {
         menu="FONDI MM2", esp="ESP", outline="Контур", tracers="Трассеры",
         names="Имена", roles="Роли", fly="Полёт", noclip="Noclip",
         bhop="Bhop", antifling="Anti-Fling", aimbot="Aimbot",
-        killall="Kill All", pickup="Auto-Pickup", reveal="Reveal Murderer",
-        range="Радиус", farm="Farm", notif="Уведомления",
+        silentaim="Silent Aim", killall="Kill All", pickup="Auto-Pickup",
+        reveal="Reveal Murderer", range="Радиус", farm="Farm", notif="Уведомления",
         flingTitle="FLING", flingBtn="ВЫБРОСИТЬ", flingAll="ВЫБРОСИТЬ ВСЕХ",
         flingSpeed="Скорость", flingSpin="Вращение",
+        flingNetOwner="Network Owner", flingPredict="Prediction",
         playerList="СПИСОК ИГРОКОВ",
         keyInput="Введите ключ", keyInvalid="Неверный ключ",
         activate="АКТИВИРОВАТЬ", checking="ПРОВЕРКА...", autologin="АВТОВХОД...",
@@ -91,16 +100,19 @@ local I18N = {
         visDamage="Индикатор урона", visWatermark="Watermark",
         visFps="График FPS", visCrosshair="Прицел",
         visKillEffect="Эффект убийства", visKillNotif="Уведомление убийства",
-        visTrail="Радужный след"
+        visTrail="Радужный след", visRadar="Радар", visItemESP="ESP предметов",
+        visKillFeed="Лог убийств",
+        saveCfg="СОХРАНИТЬ", loadCfg="ЗАГРУЗИТЬ", cfgSaved="Конфиг сохранён", cfgLoaded="Конфиг загружен"
     },
     en = {
         menu="FONDI MM2", esp="ESP", outline="Outline", tracers="Tracers",
         names="Names", roles="Roles", fly="Fly", noclip="Noclip",
         bhop="Bhop", antifling="Anti-Fling", aimbot="Aimbot",
-        killall="Kill All", pickup="Auto-Pickup", reveal="Reveal Murderer",
-        range="Range", farm="Farm", notif="Notifications",
+        silentaim="Silent Aim", killall="Kill All", pickup="Auto-Pickup",
+        reveal="Reveal Murderer", range="Range", farm="Farm", notif="Notifications",
         flingTitle="FLING", flingBtn="FLING", flingAll="FLING ALL",
         flingSpeed="Speed", flingSpin="Spin",
+        flingNetOwner="Network Owner", flingPredict="Prediction",
         playerList="PLAYER LIST",
         keyInput="Enter key", keyInvalid="Invalid key",
         activate="ACTIVATE", checking="CHECKING...", autologin="AUTO-LOGIN...",
@@ -120,7 +132,9 @@ local I18N = {
         visDamage="Damage Indicator", visWatermark="Watermark",
         visFps="FPS Graph", visCrosshair="Crosshair",
         visKillEffect="Kill Effect", visKillNotif="Kill Notification",
-        visTrail="Rainbow Trail"
+        visTrail="Rainbow Trail", visRadar="Radar", visItemESP="Item ESP",
+        visKillFeed="Kill Feed",
+        saveCfg="SAVE", loadCfg="LOAD", cfgSaved="Config saved", cfgLoaded="Config loaded"
     }
 }
 local function T(k) return (I18N[Lang] and I18N[Lang][k]) or k end
@@ -144,6 +158,27 @@ local function Tween(o, t, props, style, dir)
     local tw = TweenService:Create(o, info, props)
     tw:Play()
     return tw
+end
+
+--==================================================
+-- CONFIG SAVE/LOAD
+--==================================================
+local function SaveConfig()
+    pcall(function()
+        if writefile then
+            writefile(CONFIG_FILE, HttpService:JSONEncode(Settings))
+        end
+    end)
+end
+local function LoadConfig()
+    pcall(function()
+        if readfile and isfile and isfile(CONFIG_FILE) then
+            local data = HttpService:JSONDecode(readfile(CONFIG_FILE))
+            for k, v in pairs(data) do
+                if Settings[k] ~= nil then Settings[k] = v end
+            end
+        end
+    end)
 end
 
 --==================================================
@@ -206,7 +241,12 @@ end
 --==================================================
 -- NOTIFY
 --==================================================
+local lastNotifyTime = 0
 local function Notify(text, color, duration)
+    -- rate limit 0.3s
+    if os.clock() - lastNotifyTime < 0.3 then return end
+    lastNotifyTime = os.clock()
+
     duration = duration or 3
     local sg = pg:FindFirstChild("Fondi_Notify")
     if not sg then
@@ -376,6 +416,138 @@ local function WasOurKill(player)
 end
 
 --==================================================
+-- KILL FEED
+--==================================================
+local killFeedEntries = {}
+local KillFeedGui, KillFeedContainer
+
+local function InitKillFeed()
+    KillFeedGui = Instance.new("ScreenGui")
+    KillFeedGui.Name = "Fondi_KillFeed"
+    KillFeedGui.ResetOnSpawn = false
+    KillFeedGui.IgnoreGuiInset = true
+    KillFeedGui.DisplayOrder = 400
+    KillFeedGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    KillFeedGui.Parent = pg
+
+    KillFeedContainer = Instance.new("Frame", KillFeedGui)
+    KillFeedContainer.Size = UDim2.new(0, 280, 0, 200)
+    KillFeedContainer.Position = UDim2.new(1, -300, 0, 100)
+    KillFeedContainer.BackgroundTransparency = 1
+    KillFeedContainer.ZIndex = 10
+
+    local layout = Instance.new("UIListLayout", KillFeedContainer)
+    layout.Padding = UDim.new(0, 4)
+    layout.VerticalAlignment = Enum.VerticalAlignment.Top
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+end
+
+local function AddKillFeed(killer, victim)
+    if not Settings.KillFeed then return end
+    local time = os.date("%H:%M")
+    local text = "[" .. time .. "] " .. killer .. "  ☠  " .. victim
+
+    local frame = Instance.new("Frame", KillFeedContainer)
+    frame.Size = UDim2.new(1, 0, 0, 26)
+    frame.BackgroundColor3 = C.Card
+    frame.BackgroundTransparency = 0.15
+    frame.BorderSizePixel = 0
+    frame.ZIndex = 11
+    Corner(frame, 6)
+    Stroke(frame, C.Danger, 1, 0.3)
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1, -12, 1, 0)
+    lbl.Position = UDim2.new(0, 6, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.ZIndex = 12
+    lbl.Text = text
+    lbl.TextColor3 = C.Text
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    table.insert(killFeedEntries, frame)
+    if #killFeedEntries > 5 then
+        local old = table.remove(killFeedEntries, 1)
+        if old then old:Destroy() end
+    end
+
+    task.delay(8, function()
+        if frame and frame.Parent then
+            Tween(frame, 0.3, {BackgroundTransparency = 1})
+            Tween(lbl, 0.3, {TextTransparency = 1})
+            task.wait(0.35)
+            frame:Destroy()
+            for i, f in ipairs(killFeedEntries) do
+                if f == frame then table.remove(killFeedEntries, i) break end
+            end
+        end
+    end)
+end
+
+--==================================================
+-- SILENT AIM (namecall hook)
+--==================================================
+local SilentAimTarget = nil
+
+local function GetClosestEnemy(maxDist)
+    maxDist = maxDist or 300
+    local cam = Workspace.CurrentCamera
+    if not cam then return nil end
+    local closest, minDist = nil, maxDist
+    local mousePos = UIS:GetMouseLocation()
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LP and pl.Character then
+            local role = GetRole(pl)
+            if role == "Murderer" or role == "Sheriff" or Settings.SilentAimAll then
+                local head = pl.Character:FindFirstChild("Head")
+                if head then
+                    local pos, vis = cam:WorldToViewportPoint(head.Position)
+                    if vis then
+                        local d = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                        if d < minDist then minDist = d; closest = pl end
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function InstallSilentAim()
+    if not Settings.SilentAim then return end
+    if not hookmetamethod or not getrawmetatable then return end
+
+    local mt = getrawmetatable(game)
+    local oldNamecall = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if Settings.SilentAim and method == "FireServer" then
+            local name = self.Name
+            if name == "Knife" or name == "Gun" or name == "Revolver" then
+                SilentAimTarget = GetClosestEnemy(300)
+                if SilentAimTarget and SilentAimTarget.Character then
+                    local head = SilentAimTarget.Character:FindFirstChild("Head")
+                    if head then
+                        local args = {...}
+                        -- заменяем первый аргумент (обычно позиция/объект) на цель
+                        if #args >= 1 then
+                            args[1] = head
+                        end
+                        RegisterHit(SilentAimTarget)
+                        return oldNamecall(self, table.unpack(args))
+                    end
+                end
+            end
+        end
+        return oldNamecall(self, ...)
+    end)
+    setreadonly(mt, true)
+end
+
+--==================================================
 -- ESP
 --==================================================
 local ESPObjects, PlayerConnections = {}, {}
@@ -486,8 +658,16 @@ local function DisconnectPlayer(player)
     PlayerConnections[player] = nil
 end
 
-local function OnPlayerDied(player)
+local function OnPlayerDied(player, killer)
     if player == LP then return end
+
+    -- Kill Feed
+    if killer then
+        AddKillFeed(killer.DisplayName or "?", player.DisplayName or "?")
+    else
+        AddKillFeed("?", player.DisplayName or "?")
+    end
+
     if WasOurKill(player) then
         PlayKillSound()
         if Settings.KillNotif then
@@ -509,7 +689,7 @@ local function SetupPlayer(player)
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
             local dc = hum.Died:Connect(function()
-                OnPlayerDied(player)
+                OnPlayerDied(player, hum:GetAttribute("FondiKiller"))
             end)
             table.insert(PlayerConnections[player], dc)
         end
@@ -557,19 +737,6 @@ Players.PlayerRemoving:Connect(function(p)
 end)
 
 task.spawn(function()
-    task.wait(2)
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LP and p.Character then
-            local hum = p.Character:FindFirstChildOfClass("Humanoid")
-            if hum and not hum:GetAttribute("FondiHooked") then
-                hum:SetAttribute("FondiHooked", true)
-                hum.Died:Connect(function() OnPlayerDied(p) end)
-            end
-        end
-    end
-end)
-
-task.spawn(function()
     while task.wait(0.4) do
         if IsAuthenticated then
             for _, p in ipairs(Players:GetPlayers()) do
@@ -595,6 +762,189 @@ task.spawn(function()
         end
     end
 end)
+
+--==================================================
+-- ITEM ESP
+--==================================================
+local ItemESPObjects = {}
+
+local function ClearItemESP()
+    for obj, data in pairs(ItemESPObjects) do
+        for _, inst in ipairs(data) do
+            pcall(function() inst:Destroy() end)
+        end
+    end
+    ItemESPObjects = {}
+end
+
+local function CreateItemESP(obj, color)
+    if ItemESPObjects[obj] then return end
+    local hl = Instance.new("Highlight")
+    hl.Name = "FondiItemHL"
+    hl.Adornee = obj
+    hl.FillColor = color
+    hl.OutlineColor = color
+    hl.FillTransparency = 0.5
+    hl.OutlineTransparency = 0
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = obj
+
+    local bb = Instance.new("BillboardGui", obj)
+    bb.Size = UDim2.new(0, 100, 0, 20)
+    bb.StudsOffset = Vector3.new(0, 2, 0)
+    bb.AlwaysOnTop = true
+    local lbl = Instance.new("TextLabel", bb)
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = obj.Name
+    lbl.TextColor3 = color
+    lbl.TextStrokeTransparency = 0
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 12
+
+    ItemESPObjects[obj] = {hl, bb}
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        if not IsAuthenticated then continue end
+        if not Settings.ItemESP then
+            if next(ItemESPObjects) then ClearItemESP() end
+            continue
+        end
+        for _, obj in ipairs(Workspace:GetChildren()) do
+            if obj:IsA("Tool") or obj:IsA("Model") then
+                local n = obj.Name:lower()
+                if n:find("knife") then
+                    CreateItemESP(obj, C.Murderer)
+                elseif n:find("gun") or n:find("revolver") then
+                    CreateItemESP(obj, C.Sheriff)
+                elseif n:find("coin") or n:find("gem") or n:find("money") then
+                    CreateItemESP(obj, C.Warning)
+                end
+            end
+        end
+    end
+end)
+
+--==================================================
+-- RADAR
+--==================================================
+local RadarGui, RadarFrame, RadarDotContainer
+local RADAR_SIZE = 150
+local RADAR_RANGE = 200
+
+local function InitRadar()
+    RadarGui = Instance.new("ScreenGui")
+    RadarGui.Name = "Fondi_Radar"
+    RadarGui.ResetOnSpawn = false
+    RadarGui.IgnoreGuiInset = true
+    RadarGui.DisplayOrder = 450
+    RadarGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    RadarGui.Parent = pg
+
+    RadarFrame = Instance.new("Frame", RadarGui)
+    RadarFrame.Size = UDim2.new(0, RADAR_SIZE, 0, RADAR_SIZE)
+    RadarFrame.Position = UDim2.new(0, 12, 1, -RADAR_SIZE - 12)
+    RadarFrame.BackgroundColor3 = C.Card
+    RadarFrame.BackgroundTransparency = 0.35
+    RadarFrame.BorderSizePixel = 0
+    RadarFrame.ZIndex = 100
+    Corner(RadarFrame, RADAR_SIZE/2)
+    Stroke(RadarFrame, C.Accent, 2)
+
+    RadarDotContainer = Instance.new("Frame", RadarFrame)
+    RadarDotContainer.Size = UDim2.new(1, 0, 1, 0)
+    RadarDotContainer.BackgroundTransparency = 1
+    RadarDotContainer.ClipsDescendants = true
+    RadarDotContainer.ZIndex = 101
+    Corner(RadarDotContainer, RADAR_SIZE/2)
+
+    local cross1 = Instance.new("Frame", RadarFrame)
+    cross1.Size = UDim2.new(1, -20, 0, 1)
+    cross1.Position = UDim2.new(0, 10, 0.5, 0)
+    cross1.BackgroundColor3 = C.Border
+    cross1.BackgroundTransparency = 0.5
+    cross1.BorderSizePixel = 0
+    cross1.ZIndex = 102
+
+    local cross2 = Instance.new("Frame", RadarFrame)
+    cross2.Size = UDim2.new(0, 1, 1, -20)
+    cross2.Position = UDim2.new(0.5, 0, 0, 10)
+    cross2.BackgroundColor3 = C.Border
+    cross2.BackgroundTransparency = 0.5
+    cross2.BorderSizePixel = 0
+    cross2.ZIndex = 102
+
+    RadarFrame.Visible = false
+end
+
+local radarDots = {}
+
+local function UpdateRadar()
+    if not RadarFrame then return end
+    RadarFrame.Visible = Settings.Radar
+    if not Settings.Radar then return end
+
+    local myChar = LP.Character
+    if not myChar then return end
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return end
+
+    local myCF = myRoot.CFrame
+    local center = Vector2.new(RADAR_SIZE/2, RADAR_SIZE/2)
+    local scale = (RADAR_SIZE/2) / RADAR_RANGE
+
+    -- очистка мёртвых
+    for pl, dot in pairs(radarDots) do
+        if not pl.Parent or not pl.Character then
+            if dot then dot:Destroy() end
+            radarDots[pl] = nil
+        end
+    end
+
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LP and pl.Character then
+            local root = pl.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local rel = myCF:PointToObjectSpace(root.Position)
+                local dx = rel.X * scale
+                local dz = -rel.Z * scale  -- Z инвертируем
+
+                local dist = math.sqrt(dx*dx + dz*dz)
+                if dist > RADAR_SIZE/2 - 4 then
+                    -- выходит за границы — не рисуем
+                    if radarDots[pl] then radarDots[pl].Visible = false end
+                else
+                    local dot = radarDots[pl]
+                    if not dot then
+                        dot = Instance.new("Frame", RadarDotContainer)
+                        dot.Size = UDim2.new(0, 6, 0, 6)
+                        dot.BorderSizePixel = 0
+                        dot.ZIndex = 103
+                        Corner(dot, 3)
+                        radarDots[pl] = dot
+                    end
+                    dot.Visible = true
+                    dot.BackgroundColor3 = RoleColor(GetRole(pl))
+                    dot.Position = UDim2.new(0, center.X + dx - 3, 0, center.Y + dz - 3)
+                end
+            end
+        end
+    end
+
+    -- игрок в центре
+    if not radarDots[LP] then
+        local me = Instance.new("Frame", RadarDotContainer)
+        me.Size = UDim2.new(0, 6, 0, 6)
+        me.BorderSizePixel = 0
+        me.ZIndex = 104
+        me.BackgroundColor3 = C.Accent2
+        Corner(me, 3)
+        radarDots[LP] = me
+    end
+    radarDots[LP].Position = UDim2.new(0, center.X - 3, 0, center.Y - 3)
+end
 
 --==================================================
 -- VISUALS: HUD GUI
@@ -640,7 +990,7 @@ crosshair.Visible = false
 
 -- Watermark
 local watermark = Instance.new("Frame", HudGui)
-watermark.Size = UDim2.new(0, 220, 0, 26)
+watermark.Size = UDim2.new(0, 260, 0, 26)
 watermark.Position = UDim2.new(0, 12, 0, 12)
 watermark.BackgroundColor3 = C.Card
 watermark.BackgroundTransparency = 0.15
@@ -654,7 +1004,7 @@ wmLabel.Size = UDim2.new(1, -12, 1, 0)
 wmLabel.Position = UDim2.new(0, 6, 0, 0)
 wmLabel.BackgroundTransparency = 1
 wmLabel.ZIndex = 101
-wmLabel.Text = "FONDI MM2 " .. VERSION .. " | 60 FPS | 0 ms"
+wmLabel.Text = "FONDI MM2 " .. VERSION
 wmLabel.TextColor3 = C.Text
 wmLabel.Font = Enum.Font.GothamBold
 wmLabel.TextSize = 11
@@ -680,8 +1030,22 @@ fpsGraph.BackgroundTransparency = 1
 fpsGraph.ClipsDescendants = true
 fpsGraph.ZIndex = 101
 
+-- пул баров
+local FPS_BARS = 40
+local fpsBars = {}
+for i = 1, FPS_BARS do
+    local bar = Instance.new("Frame", fpsGraph)
+    bar.Size = UDim2.new(0, 0, 0, 0)
+    bar.AnchorPoint = Vector2.new(0, 1)
+    bar.BorderSizePixel = 0
+    bar.ZIndex = 102
+    fpsBars[i] = bar
+end
+
 local fpsValues = {}
-for i = 1, 40 do fpsValues[i] = 60 end
+for i = 1, FPS_BARS do fpsValues[i] = 60 end
+local fpsAccum = 0
+local fpsFrames = 0
 
 fpsGraphBg.Visible = false
 
@@ -764,7 +1128,7 @@ function KillNotification(victimName)
     end)
 end
 
--- Kill Effect (flash at center)
+-- Kill Effect
 local killEffect = Instance.new("Frame", HudGui)
 killEffect.Size = UDim2.new(0, 200, 0, 200)
 killEffect.Position = UDim2.new(0.5, -100, 0.5, -100)
@@ -786,7 +1150,6 @@ function ShowKillEffect()
     }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 end
 
--- Hitmarker function
 function ShowHitmarker()
     if not Settings.Hitmarker then return end
     hitmarker.Visible = true
@@ -809,8 +1172,30 @@ function ShowHitmarker()
     end)
 end
 
--- Damage Indicator (arrows)
-local damageIndicators = {}
+-- Damage Indicator (fix: реальное направление)
+local function GetAttackerDirection()
+    local myChar = LP.Character
+    if not myChar then return 0 end
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return 0 end
+    local closest, minD = nil, 100
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LP and p.Character then
+            local role = GetRole(p)
+            if role == "Murderer" or role == "Sheriff" then
+                local tr = p.Character:FindFirstChild("HumanoidRootPart")
+                if tr then
+                    local d = (tr.Position - myRoot.Position).Magnitude
+                    if d < minD then minD = d; closest = tr end
+                end
+            end
+        end
+    end
+    if not closest then return 0 end
+    local dir = (closest.Position - myRoot.Position).Unit
+    local look = myRoot.CFrame.LookVector
+    return math.atan2(dir.Z, dir.X) - math.atan2(look.Z, look.X)
+end
 
 local function ShowDamageDirection(angle)
     if not Settings.DamageIndicator then return end
@@ -823,7 +1208,6 @@ local function ShowDamageDirection(angle)
     arrow.ZIndex = 220
     Corner(arrow, 6)
 
-    local radius = 150
     local cx = 0.5 + math.cos(angle) * 0.15
     local cy = 0.5 + math.sin(angle) * 0.15
     arrow.Position = UDim2.new(cx, -15, cy, -15)
@@ -880,42 +1264,41 @@ local function CreateTrail()
 end
 
 --==================================================
--- UPDATE LOOPS FOR HUD
+-- UPDATE LOOP FOR HUD
 --==================================================
+RunService.RenderStepped:Connect(function(dt)
+    fpsAccum = fpsAccum + dt
+    fpsFrames = fpsFrames + 1
+end)
+
 task.spawn(function()
     while task.wait(0.5) do
         if Settings.Watermark then
             watermark.Visible = true
-            local fps = math.floor(1 / RunService.RenderStepped:Wait())
+            local fps = fpsFrames > 0 and math.floor(fpsFrames / fpsAccum) or 0
+            fpsAccum = 0; fpsFrames = 0
             local ping = 0
             pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-            wmLabel.Text = string.format("FONDI MM2 " .. VERSION .. " | %d FPS | %d ms", fps, ping)
+            local playerCount = #Players:GetPlayers()
+            wmLabel.Text = string.format("FONDI %s | %d FPS | %d ms | %d players",
+                VERSION, fps, ping, playerCount)
         else
             watermark.Visible = false
         end
 
         if Settings.FpsGraph then
             fpsGraphBg.Visible = true
-
-            local fps = math.floor(1 / RunService.RenderStepped:Wait())
+            local fps = fpsFrames > 0 and math.floor(fpsFrames / fpsAccum) or 60
             table.remove(fpsValues, 1)
             table.insert(fpsValues, fps)
 
-            for _, c in ipairs(fpsGraph:GetChildren()) do
-                if c:IsA("Frame") then c:Destroy() end
-            end
-
-            local count = #fpsValues
-            local barWidth = fpsGraph.AbsoluteSize.X / count
+            local barW = fpsGraph.AbsoluteSize.X / FPS_BARS
             for i, val in ipairs(fpsValues) do
-                local bar = Instance.new("Frame", fpsGraph)
+                local bar = fpsBars[i]
                 local h = math.clamp(val / 120, 0, 1)
-                bar.Size = UDim2.new(0, math.max(barWidth - 1, 1), h, 0)
-                bar.Position = UDim2.new(0, (i-1) * barWidth, 1, 0)
-                bar.AnchorPoint = Vector2.new(0, 1)
+                bar.Size = UDim2.new(0, math.max(barW - 1, 1), h, 0)
+                bar.Position = UDim2.new(0, (i-1) * barW, 1, 0)
                 bar.BackgroundColor3 = val >= 50 and C.Green or (val >= 30 and C.Warning or C.Danger)
-                bar.BorderSizePixel = 0
-                bar.ZIndex = 102
             end
         else
             fpsGraphBg.Visible = false
@@ -924,14 +1307,12 @@ task.spawn(function()
         crosshair.Visible = Settings.Crosshair
 
         if Settings.RainbowTrail then
-            if #trailAttachments == 0 then
-                CreateTrail()
-            end
+            if #trailAttachments == 0 then CreateTrail() end
         else
-            if #trailAttachments > 0 then
-                ClearTrail()
-            end
+            if #trailAttachments > 0 then ClearTrail() end
         end
+
+        UpdateRadar()
     end
 end)
 
@@ -989,7 +1370,7 @@ local function StartFly()
         h.PlatformStand = true
         r.Velocity = Vector3.zero
         r.RotVelocity = Vector3.zero
-        local cam = workspace.CurrentCamera
+        local cam = Workspace.CurrentCamera
         if not cam then return end
         local move = Vector3.zero
         if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
@@ -1028,7 +1409,7 @@ local function StartBhop()
 end
 
 --==================================================
--- ANTI-FLING
+-- ANTI-FLING (fix threshold)
 --==================================================
 local afConnection = nil
 local function StopAntiFling()
@@ -1042,7 +1423,8 @@ local function StartAntiFling()
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
-        if r.Velocity.Magnitude > 200 or r.RotVelocity.Magnitude > 100 then
+        -- понижен порог: 80 / 30
+        if r.Velocity.Magnitude > 80 or r.RotVelocity.Magnitude > 30 then
             r.Velocity = Vector3.zero
             r.RotVelocity = Vector3.zero
         end
@@ -1061,7 +1443,7 @@ local function StartAimbot()
     aimbotConnection = RunService.RenderStepped:Connect(function()
         if not IsAuthenticated or not Settings.Aimbot then return end
         if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
-        local cam = workspace.CurrentCamera
+        local cam = Workspace.CurrentCamera
         if not cam then return end
         local closest, minDist = nil, 200
         for _, pl in ipairs(Players:GetPlayers()) do
@@ -1099,7 +1481,7 @@ local function StartPickup()
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
 
-        for _, obj in ipairs(workspace:GetChildren()) do
+        for _, obj in ipairs(Workspace:GetChildren()) do
             local targetPart = nil
 
             if obj:IsA("Tool") then
@@ -1151,16 +1533,13 @@ local function StartKillAll()
     StopKillAll()
     killAllConnection = RunService.Heartbeat:Connect(function()
         if not IsAuthenticated or not Settings.KillAll then return end
-        if os.clock() - lastKillTime < 0.35 then return end
+        if os.clock() - lastKillTime < 0.2 then return end
 
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
         local hum = c:FindFirstChildOfClass("Humanoid")
         if not r or not hum then return end
-
-        local w = GetWeapon()
-        if not w then return end
 
         local target, targetDist = nil, Settings.KillAuraRange
         for _, pl in ipairs(Players:GetPlayers()) do
@@ -1176,13 +1555,25 @@ local function StartKillAll()
 
         if not target then return end
         local tr = target.Character.HumanoidRootPart
+        local th = target.Character:FindFirstChildOfClass("Humanoid")
 
+        -- телепорт вплотную + атака
         r.CFrame = CFrame.new(tr.Position - tr.CFrame.LookVector * 2 + Vector3.new(0, 1, 0),
                               Vector3.new(tr.Position.X, r.Position.Y, tr.Position.Z))
 
-        pcall(function() w:Activate() end)
-        task.wait(0.03)
-        pcall(function() w:Activate() end)
+        local w = GetWeapon()
+        if w then
+            pcall(function() w:Activate() end)
+        end
+        -- fallback: прямое убийство через Health (работает если сервер не валидирует)
+        if th then
+            pcall(function()
+                local killer = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+                if killer then
+                    th:TakeDamage(th.Health, killer, w)
+                end
+            end)
+        end
 
         RegisterHit(target)
         ShowHitmarker()
@@ -1191,20 +1582,23 @@ local function StartKillAll()
 end
 
 --==================================================
--- FLING (SPIN-FLING METHOD)
--- Читер резко разгоняется и крутится вокруг жертвы.
--- При столкновении физика Roblox передаёт импульс жертве.
+-- FLING (V11.3: Network Owner + Prediction)
 --==================================================
-local flingActive = false
-local flingConnection = nil
-local flingTarget = nil
+local activeFlings = {}  -- [player] = connection
+local flingParams = {}   -- [player] = {target, startTime}
 
-local function StopFling()
-    flingActive = false
-    flingTarget = nil
-    if flingConnection then
-        flingConnection:Disconnect()
-        flingConnection = nil
+local function StopFlingFor(targetPlayer)
+    local con = activeFlings[targetPlayer]
+    if con then
+        pcall(function() con:Disconnect() end)
+        activeFlings[targetPlayer] = nil
+    end
+    flingParams[targetPlayer] = nil
+end
+
+local function StopAllFlings()
+    for pl, _ in pairs(activeFlings) do
+        StopFlingFor(pl)
     end
     local char = LP.Character
     if char then
@@ -1216,74 +1610,106 @@ local function StopFling()
     end
 end
 
+-- Пытаемся забрать network ownership у цели (работает только если executor имеет доступ)
+local function TrySetNetworkOwner(targetRoot)
+    if not Settings.FlingUseNetworkOwner then return false end
+    local ok = pcall(function()
+        if setnetworkowner then
+            setnetworkowner(targetRoot, nil)
+        elseif targetRoot.SetNetworkOwner then
+            targetRoot:SetNetworkOwner(nil)
+        else
+            error("no method")
+        end
+    end)
+    return ok
+end
+
 local function StartFling(target)
-    StopFling()
     if not target or not target.Character then return end
+    StopFlingFor(target)
 
-    flingTarget = target
-    flingActive = true
+    local myChar = LP.Character
+    if not myChar then return end
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+    local myHum = myChar:FindFirstChildOfClass("Humanoid")
+    if not myRoot or not myHum then return end
 
-    flingConnection = RunService.Heartbeat:Connect(function(dt)
-        if not flingActive or not flingTarget then
-            StopFling()
+    local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+
+    -- Network owner attempt
+    local netOwned = TrySetNetworkOwner(targetRoot)
+
+    flingParams[target] = {startTime = os.clock(), netOwned = netOwned}
+
+    activeFlings[target] = RunService.Heartbeat:Connect(function(dt)
+        local params = flingParams[target]
+        if not params then StopFlingFor(target) return end
+        if os.clock() - params.startTime > 5 then
+            -- возвращаем владельца
+            pcall(function()
+                if targetRoot and targetRoot.Parent then
+                    targetRoot:SetNetworkOwner(target)
+                end
+            end)
+            StopFlingFor(target)
             return
         end
 
-        local myChar = LP.Character
-        if not myChar then StopFling() return end
-        local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-        local myHum = myChar:FindFirstChildOfClass("Humanoid")
-        if not myRoot or not myHum then StopFling() return end
+        local myC = LP.Character
+        if not myC then StopFlingFor(target) return end
+        local myR = myC:FindFirstChild("HumanoidRootPart")
+        local myH = myC:FindFirstChildOfClass("Humanoid")
+        if not myR or not myH then StopFlingFor(target) return end
 
-        local tChar = flingTarget.Character
-        if not tChar then StopFling() return end
-        local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-        if not tRoot then StopFling() return end
+        local tC = target.Character
+        if not tC then StopFlingFor(target) return end
+        local tR = tC:FindFirstChild("HumanoidRootPart")
+        if not tR then StopFlingFor(target) return end
 
-        -- Отключаем обычную физику гуманоида, чтобы скорость не сбрасывалась
-        myHum.PlatformStand = true
-        myHum.AutoRotate = false
+        myH.PlatformStand = true
+        myH.AutoRotate = false
 
-        local dir = (tRoot.Position - myRoot.Position)
+        -- Prediction: учитываем velocity цели
+        local predictedPos = tR.Position
+        if Settings.FlingPrediction then
+            local tv = tR.AssemblyLinearVelocity
+            predictedPos = tR.Position + tv * 0.15  -- на 150мс вперёд
+        end
+
+        local dir = (predictedPos - myR.Position)
         local dist = dir.Magnitude
-        if dist < 0.01 then
-            dir = Vector3.new(1, 0, 0)
-        else
-            dir = dir.Unit
-        end
+        if dist < 0.01 then dir = Vector3.new(1,0,0) else dir = dir.Unit end
 
-        -- 1) Разгон в сторону жертвы
-        myRoot.AssemblyLinearVelocity = dir * Settings.FlingSpeed
+        -- Телепорт вплотную
+        myR.CFrame = CFrame.new(predictedPos - dir * 2 + Vector3.new(0, 1, 0), predictedPos)
 
-        -- 2) Если мы далеко — телепортируемся вплотную (2 стада)
-        if dist > 5 then
-            myRoot.CFrame = CFrame.new(tRoot.Position - dir * 2 + Vector3.new(0, 1, 0),
-                                       tRoot.Position)
-        end
+        -- Импульс
+        myR.AssemblyLinearVelocity = dir * Settings.FlingSpeed
 
-        -- 3) Огромная угловая скорость — это и передаёт импульс
-        myRoot.AssemblyAngularVelocity = Vector3.new(
-            Settings.FlingSpin,
-            Settings.FlingSpin,
-            Settings.FlingSpin
+        -- Огромная угловая скорость
+        myR.AssemblyAngularVelocity = Vector3.new(
+            Settings.FlingSpin, Settings.FlingSpin, Settings.FlingSpin
         )
 
-        -- 4) Микротолчки, чтобы физика не «успокаивалась»
-        myRoot.AssemblyLinearVelocity = myRoot.AssemblyLinearVelocity + Vector3.new(
-            math.random(-30, 30),
-            math.random(-30, 30),
-            math.random(-30, 30)
+        -- Микротолчки
+        myR.AssemblyLinearVelocity = myR.AssemblyLinearVelocity + Vector3.new(
+            math.random(-30, 30), math.random(-30, 30), math.random(-30, 30)
         )
-    end)
 
-    -- Авто-стоп через 6 секунд, чтобы не залипнуть в PlatformStand
-    task.delay(6, function()
-        if flingActive and flingTarget == target then
-            StopFling()
+        -- Если удалось забрать network ownership — долбим цель напрямую
+        if params.netOwned then
+            pcall(function()
+                tR.AssemblyLinearVelocity = Vector3.new(
+                    math.random(-500, 500), 200, math.random(-500, 500)
+                )
+                tR.AssemblyAngularVelocity = Vector3.new(500, 500, 500)
+            end)
         end
     end)
 
-    Notify("FLING → " .. target.DisplayName, C.Pink, 2)
+    Notify("FLING → " .. target.DisplayName .. (netOwned and " [NET]" or " [SPIN]"), C.Pink, 2)
 end
 
 local function FlingAll()
@@ -1291,8 +1717,6 @@ local function FlingAll()
         if pl ~= LP and pl.Character then
             task.spawn(function()
                 StartFling(pl)
-                task.wait(1.2)
-                StopFling()
             end)
         end
     end
@@ -1314,7 +1738,7 @@ local function StartFarm()
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
         local closest, minDist = nil, math.huge
-        for _, obj in ipairs(workspace:GetDescendants()) do
+        for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj:IsA("BasePart") and (obj.Name:lower():find("coin") or obj.Name:lower():find("gem") or obj.Name:lower():find("money")) then
                 local d = (obj.Position - r.Position).Magnitude
                 if d < minDist then minDist = d; closest = obj end
@@ -1328,18 +1752,16 @@ end
 -- ANTI-KICK
 --==================================================
 pcall(function()
-    local oldKick = hookfunction or hookfunc
-    if oldKick and LP.Kick then
-        oldKick(LP.Kick, function(self, msg)
+    if hookfunction and LP.Kick then
+        hookfunction(LP.Kick, function(self, msg)
             Notify("ANTI-KICK: " .. tostring(msg), C.Danger, 5)
-            task.wait(0.05)
-            return LP.Kick(self, msg)
+            return nil
         end)
     end
 end)
 
 --==================================================
--- DAMAGE DETECTION
+-- DAMAGE DETECTION (fix: реальное направление)
 --==================================================
 task.spawn(function()
     while task.wait(0.1) do
@@ -1347,13 +1769,13 @@ task.spawn(function()
         local char = LP.Character
         if not char then continue end
         local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum and hum.Health < (hum:GetAttribute("FondiLastHP") or hum.MaxHealth) then
-            local lastHP = hum:GetAttribute("FondiLastHP") or hum.MaxHealth
-            if hum.Health < lastHP and Settings.DamageIndicator then
-                ShowDamageDirection(math.random() * math.pi * 2)
-            end
-        end
         if hum then
+            local lastHP = hum:GetAttribute("FondiLastHP") or hum.MaxHealth
+            if hum.Health < lastHP then
+                if Settings.DamageIndicator then
+                    ShowDamageDirection(GetAttackerDirection())
+                end
+            end
             hum:SetAttribute("FondiLastHP", hum.Health)
         end
     end
@@ -1445,7 +1867,7 @@ local function ShowLoadingScreen(callback)
 
     Tween(logo, 0.6, {TextTransparency = 0}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     Tween(logo2, 0.6, {TextTransparency = 0}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    Tween(barBg, 0.5, {BackgroundTransparency = 0}, nil, nil, 0.5)
+    Tween(barBg, 0.5, {BackgroundTransparency = 0})
     Tween(statusText, 0.6, {TextTransparency = 0})
 
     task.spawn(function()
@@ -1492,8 +1914,8 @@ function BuildUI()
     MainGui.Parent = pg
 
     MainFrame = Instance.new("Frame", MainGui)
-    MainFrame.Size = UDim2.new(0, 480, 0, 580)
-    MainFrame.Position = UDim2.new(0.5, -240, 0.5, -290)
+    MainFrame.Size = UDim2.new(0, 500, 0, 600)
+    MainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
     MainFrame.BackgroundColor3 = C.Card
     MainFrame.BackgroundTransparency = 0.02
     MainFrame.BorderSizePixel = 0
@@ -1501,8 +1923,7 @@ function BuildUI()
     MainFrame.Draggable = true
     MainFrame.ZIndex = 10
     Corner(MainFrame, 20)
-
-    local mainStroke = Stroke(MainFrame, C.Accent, 1.5)
+    Stroke(MainFrame, C.Accent, 1.5)
 
     local header = Instance.new("Frame", MainFrame)
     header.Size = UDim2.new(1, 0, 0, 70)
@@ -1548,8 +1969,6 @@ function BuildUI()
     Corner(langBtn, 10)
     Stroke(langBtn, C.Accent2, 1)
 
-    langBtn.MouseEnter:Connect(function() Tween(langBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(50, 50, 70)}) end)
-    langBtn.MouseLeave:Connect(function() Tween(langBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(35, 35, 50)}) end)
     langBtn.MouseButton1Click:Connect(function()
         Lang = (Lang == "ru") and "en" or "ru"
         SaveLang(Lang)
@@ -1572,9 +1991,6 @@ function BuildUI()
     close.ZIndex = 12
     Corner(close, 10)
 
-    close.MouseEnter:Connect(function() Tween(close, 0.2, {BackgroundColor3 = Color3.fromRGB(80, 25, 30)}) end)
-    close.MouseLeave:Connect(function() Tween(close, 0.2, {BackgroundColor3 = Color3.fromRGB(50, 20, 25)}) end)
-
     close.MouseButton1Click:Connect(function()
         PlayClick()
         Tween(MainFrame, 0.3, {
@@ -1583,8 +1999,8 @@ function BuildUI()
         }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
         task.wait(0.3)
         MainFrame.Visible = false
-        MainFrame.Size = UDim2.new(0, 480, 0, 580)
-        MainFrame.Position = UDim2.new(0.5, -240, 0.5, -290)
+        MainFrame.Size = UDim2.new(0, 500, 0, 600)
+        MainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
     end)
 
     local tabBar = Instance.new("Frame", MainFrame)
@@ -1640,23 +2056,19 @@ function BuildUI()
                 tabContents[tid].Visible = isActive
             end
         end
-
         local activeBtn = tabButtons[id]
         if activeBtn then
             Tween(indicator, 0.3, {
                 Position = UDim2.new(0, activeBtn.AbsolutePosition.X - tabBar.AbsolutePosition.X, 1, -4),
                 Size = UDim2.new(0, activeBtn.AbsoluteSize.X, 0, 3)
             }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
-            if tabContents[id] then
-                tabContents[id].Visible = true
-            end
+            if tabContents[id] then tabContents[id].Visible = true end
         end
     end
 
     for _, t in ipairs(tabData) do
         local btn = Instance.new("TextButton", tabBar)
-        btn.Size = UDim2.new(0, 66, 0, 30)
+        btn.Size = UDim2.new(0, 68, 0, 30)
         btn.BackgroundColor3 = Color3.fromRGB(28, 28, 42)
         btn.BackgroundTransparency = 1
         btn.Text = t.label
@@ -1667,7 +2079,6 @@ function BuildUI()
         btn.AutoButtonColor = false
         btn.ZIndex = 12
         Corner(btn, 8)
-
         tabButtons[t.id] = btn
 
         local content = Instance.new("ScrollingFrame", contentArea)
@@ -1682,19 +2093,7 @@ function BuildUI()
         content.ZIndex = 12
         local cl = Instance.new("UIListLayout", content)
         cl.Padding = UDim.new(0, 8)
-
         tabContents[t.id] = content
-
-        btn.MouseEnter:Connect(function()
-            if currentTab ~= t.id then
-                Tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(35, 35, 50), BackgroundTransparency = 0.5})
-            end
-        end)
-        btn.MouseLeave:Connect(function()
-            if currentTab ~= t.id then
-                Tween(btn, 0.2, {BackgroundTransparency = 1})
-            end
-        end)
 
         btn.MouseButton1Click:Connect(function()
             PlayClick()
@@ -1707,7 +2106,6 @@ function BuildUI()
 
     local function CreateToggle(parent, name, setting, color, callback)
         color = color or C.Accent
-
         local btn = Instance.new("TextButton", parent)
         btn.Size = UDim2.new(1, -5, 0, 42)
         btn.BackgroundColor3 = Settings[setting] and Color3.fromRGB(30, 30, 48) or Color3.fromRGB(22, 22, 32)
@@ -1716,7 +2114,6 @@ function BuildUI()
         btn.AutoButtonColor = false
         btn.ZIndex = 15
         Corner(btn, 12)
-
         local bs = Stroke(btn, Settings[setting] and color or C.Border, 1.5)
 
         local lbl = Instance.new("TextLabel", btn)
@@ -1746,22 +2143,11 @@ function BuildUI()
         knob.ZIndex = 17
         Corner(knob, 9)
 
-        btn.MouseEnter:Connect(function()
-            Tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(32, 32, 46)})
-        end)
-        btn.MouseLeave:Connect(function()
-            if not Settings[setting] then
-                Tween(btn, 0.2, {BackgroundColor3 = Color3.fromRGB(22, 22, 32)})
-            end
-        end)
-
         btn.MouseButton1Click:Connect(function()
             Settings[setting] = not Settings[setting]
             local on = Settings[setting]
-
             PlayClick()
             BurstFrom(btn)
-
             Tween(btn, 0.25, {BackgroundColor3 = on and Color3.fromRGB(30, 30, 48) or Color3.fromRGB(22, 22, 32)})
             Tween(bs, 0.25, {Color = on and color or C.Border})
             Tween(lbl, 0.25, {TextColor3 = on and color or C.Text})
@@ -1769,14 +2155,12 @@ function BuildUI()
             Tween(knob, 0.3, {
                 Position = on and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
             }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
             if callback then callback(on) end
         end)
     end
 
     local function CreateSlider(parent, name, minV, maxV, default, color, setter)
         color = color or C.Accent
-
         local frame = Instance.new("Frame", parent)
         frame.Size = UDim2.new(1, -5, 0, 48)
         frame.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
@@ -1881,6 +2265,9 @@ function BuildUI()
     CreateToggle(tabContents["combat"], T("aimbot"), "Aimbot", C.Danger, function(on)
         if on then StartAimbot() else StopAimbot() end
     end)
+    CreateToggle(tabContents["combat"], T("silentaim"), "SilentAim", C.Murderer, function(on)
+        if on then InstallSilentAim() end
+    end)
     CreateToggle(tabContents["combat"], T("killall"), "KillAll", C.Pink, function(on)
         if on then StartKillAll() else StopKillAll() end
     end)
@@ -1901,13 +2288,14 @@ function BuildUI()
     flingTitle.TextSize = 11
     flingTitle.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Слайдеры флинга
     CreateSlider(tabContents["combat"], T("flingSpeed"), 100, 800, Settings.FlingSpeed, C.Danger, function(v)
         Settings.FlingSpeed = v
     end)
     CreateSlider(tabContents["combat"], T("flingSpin"), 100, 1500, Settings.FlingSpin, C.Pink, function(v)
         Settings.FlingSpin = v
     end)
+    CreateToggle(tabContents["combat"], T("flingNetOwner"), "FlingUseNetworkOwner", C.Success)
+    CreateToggle(tabContents["combat"], T("flingPredict"), "FlingPrediction", C.Blue)
 
     local selectedFlingTarget = nil
     local playerBtn = Instance.new("TextButton", tabContents["combat"])
@@ -1937,9 +2325,6 @@ function BuildUI()
     Stroke(dropdown, C.Accent, 1)
     local dLayout = Instance.new("UIListLayout", dropdown)
     dLayout.Padding = UDim.new(0, 3)
-    local dPad = Instance.new("UIPadding", dropdown)
-    dPad.PaddingTop = UDim.new(0, 6)
-    dPad.PaddingBottom = UDim.new(0, 6)
 
     local function RefreshDropdown()
         for _, c in ipairs(dropdown:GetChildren()) do
@@ -2020,6 +2405,9 @@ function BuildUI()
     CreateToggle(tabContents["visual"], T("visKillEffect"), "KillEffect", C.Pink)
     CreateToggle(tabContents["visual"], T("visKillNotif"), "KillNotif", C.Blue)
     CreateToggle(tabContents["visual"], T("visTrail"), "RainbowTrail", C.Orange)
+    CreateToggle(tabContents["visual"], T("visRadar"), "Radar", C.Accent2)
+    CreateToggle(tabContents["visual"], T("visItemESP"), "ItemESP", C.Warning)
+    CreateToggle(tabContents["visual"], T("visKillFeed"), "KillFeed", C.Danger)
 
     -- FARM TAB
     CreateToggle(tabContents["farm"], T("farm"), "Farm", Color3.fromRGB(255, 200, 50), function(on)
@@ -2028,6 +2416,44 @@ function BuildUI()
 
     -- MISC TAB
     CreateToggle(tabContents["misc"], T("notif"), "Notifications", Color3.fromRGB(100, 200, 255))
+
+    local saveBtn = Instance.new("TextButton", tabContents["misc"])
+    saveBtn.Size = UDim2.new(0.48, -5, 0, 42)
+    saveBtn.BackgroundColor3 = C.Success
+    saveBtn.Text = T("saveCfg")
+    saveBtn.TextColor3 = Color3.new(1,1,1)
+    saveBtn.Font = Enum.Font.GothamBold
+    saveBtn.TextSize = 12
+    saveBtn.BorderSizePixel = 0
+    saveBtn.AutoButtonColor = false
+    saveBtn.ZIndex = 15
+    Corner(saveBtn, 12)
+    saveBtn.MouseButton1Click:Connect(function()
+        SaveConfig()
+        PlayClick()
+        BurstFrom(saveBtn)
+        Notify(T("cfgSaved"), C.Success)
+    end)
+
+    local loadBtn = Instance.new("TextButton", tabContents["misc"])
+    loadBtn.Size = UDim2.new(0.48, -5, 0, 42)
+    loadBtn.BackgroundColor3 = C.Blue
+    loadBtn.Text = T("loadCfg")
+    loadBtn.TextColor3 = Color3.new(1,1,1)
+    loadBtn.Font = Enum.Font.GothamBold
+    loadBtn.TextSize = 12
+    loadBtn.BorderSizePixel = 0
+    loadBtn.AutoButtonColor = false
+    loadBtn.ZIndex = 15
+    Corner(loadBtn, 12)
+    loadBtn.MouseButton1Click:Connect(function()
+        LoadConfig()
+        PlayClick()
+        BurstFrom(loadBtn)
+        Notify(T("cfgLoaded"), C.Success)
+        if MainGui then pcall(function() MainGui:Destroy() end) end
+        BuildUI()
+    end)
 
     local listTitle = Instance.new("TextLabel", tabContents["misc"])
     listTitle.Size = UDim2.new(1, -5, 0, 22)
@@ -2086,8 +2512,8 @@ function BuildUI()
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     task.wait(0.05)
     Tween(MainFrame, 0.5, {
-        Size = UDim2.new(0, 480, 0, 580),
-        Position = UDim2.new(0.5, -240, 0.5, -290)
+        Size = UDim2.new(0, 500, 0, 600),
+        Position = UDim2.new(0.5, -250, 0.5, -300)
     }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 end
 
@@ -2101,8 +2527,8 @@ local function ToggleMenu()
         MainFrame.Size = UDim2.new(0, 0, 0, 0)
         MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
         Tween(MainFrame, 0.4, {
-            Size = UDim2.new(0, 480, 0, 580),
-            Position = UDim2.new(0.5, -240, 0.5, -290)
+            Size = UDim2.new(0, 500, 0, 600),
+            Position = UDim2.new(0.5, -250, 0.5, -300)
         }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     else
         Tween(MainFrame, 0.3, {
@@ -2111,8 +2537,8 @@ local function ToggleMenu()
         }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
         task.wait(0.3)
         MainFrame.Visible = false
-        MainFrame.Size = UDim2.new(0, 480, 0, 580)
-        MainFrame.Position = UDim2.new(0.5, -240, 0.5, -290)
+        MainFrame.Size = UDim2.new(0, 500, 0, 600)
+        MainFrame.Position = UDim2.new(0.5, -250, 0.5, -300)
     end
 end
 
@@ -2137,6 +2563,12 @@ UIS.InputBegan:Connect(function(input, gp)
         if Settings.Farm then StartFarm() else StopFarm() end
     end
 end)
+
+--==================================================
+-- INIT EXTRAS
+--==================================================
+InitKillFeed()
+InitRadar()
 
 --==================================================
 -- KEY GUI
@@ -2174,7 +2606,7 @@ keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 78)
 keySub.BackgroundTransparency = 1
 keySub.ZIndex = 15
-keySub.Text = VERSION .. " • VISUALS"
+keySub.Text = VERSION .. " • NETWORK"
 keySub.TextColor3 = C.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -2196,7 +2628,9 @@ keyLangBtn.MouseButton1Click:Connect(function()
     SaveLang(Lang)
     PlayClick()
     KeyGui:Destroy()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/p1shenak/main.lua/refs/heads/main/main.lua"))()
+    if getgenv then
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/p1shenak/main.lua/refs/heads/main/main.lua"))()
+    end
 end)
 
 local KeyBox = Instance.new("TextBox", KeyFrame)
@@ -2376,13 +2810,14 @@ GenBtn.MouseButton1Click:Connect(function()
     PlayClick()
     BurstFrom(GenBtn)
     task.spawn(function()
-        local key = GenerateKeyRemote(selectedDuration)
+        local key, err = GenerateKeyRemote(selectedDuration)
         if key then
             KeyBox.Text = key
             Notify(T("keyCreated"), C.Success)
             GenBtn.Text = T("done")
             GenBtn.BackgroundColor3 = C.Success
         else
+            Notify(err or "Generate failed", C.Danger)
             GenBtn.Text = T("generate")
             GenBtn.BackgroundColor3 = C.Success
             GenBtn.Active = true
@@ -2416,6 +2851,12 @@ end)
 --==================================================
 -- AUTOLOGIN
 --==================================================
+do
+    local saved = LoadLang()
+    if saved then Lang = saved end
+    LoadConfig()
+end
+
 task.spawn(function()
     task.wait(0.5)
     local saved = LoadKey()
@@ -2437,13 +2878,9 @@ task.spawn(function()
     end
 end)
 
-do
-    local saved = LoadLang()
-    if saved then Lang = saved end
-end
-
 print("==========================================")
-print("[FONDI MM2 " .. VERSION .. "] VISUALS READY")
+print("[FONDI MM2 " .. VERSION .. "] NETWORK EDITION READY")
 print("[FONDI MM2] Press L to toggle menu")
-print("[FONDI MM2] FIXED: KillAll / AutoPickup / Fling (spin-fling)")
+print("[FONDI MM2] Fix: Fling (netowner + prediction), DamageIndicator, Anti-Fling threshold, FlingAll")
+print("[FONDI MM2] New: SilentAim, Radar, ItemESP, KillFeed, Config save/load")
 print("==========================================")
