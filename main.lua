@@ -1,5 +1,5 @@
 --[[
-    FONDI MM2 V11.1 // VISUALS EDITION
+    FONDI MM2 V11.0 // VISUALS EDITION
     - Hitmarker / Kill Effect / Damage Indicator
     - Watermark / FPS Graph / Custom Crosshair
     - Kill Notification / Rainbow Trail
@@ -31,6 +31,7 @@ local Settings = {
     Fly=false, Noclip=false, Bhop=false, AntiFling=false, FlySpeed=55,
     Aimbot=false, RevealMurderer=false, AutoPickup=false,
     KillAll=false, KillAuraRange=15, Farm=false, Notifications=true,
+    -- Visuals
     KillSound=true, Hitmarker=true, DamageIndicator=true,
     Watermark=true, FpsGraph=true, Crosshair=true,
     KillEffect=true, KillNotif=true, RainbowTrail=false
@@ -138,7 +139,9 @@ local function Tween(o, t, props, style, dir)
     return tw
 end
 
+--==================================================
 -- HTTP / AUTH
+--==================================================
 local function HttpPost(url, body)
     local json = HttpService:JSONEncode(body)
     local ok, result = pcall(function()
@@ -150,9 +153,7 @@ local function HttpPost(url, body)
             return http_request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json})
         elseif fluxus and fluxus.request then
             return fluxus.request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json})
-        else
-            error("No HTTP")
-        end
+        else error("No HTTP") end
     end)
     if not ok or not result then return nil, "HTTP failed" end
     local ok2, data = pcall(function() return HttpService:JSONDecode(result.Body or result) end)
@@ -195,7 +196,9 @@ local function LoadLang()
     if ok and (c == "ru" or c == "en") then return c end
 end
 
+--==================================================
 -- NOTIFY
+--==================================================
 local function Notify(text, color, duration)
     duration = duration or 3
     local sg = pg:FindFirstChild("Fondi_Notify")
@@ -334,7 +337,9 @@ local function PlayKillSound()
     end)
 end
 
+--==================================================
 -- ROLE
+--==================================================
 local function GetRole(player)
     if not player then return "Innocent" end
     local char = player.Character
@@ -346,8 +351,10 @@ local function GetRole(player)
 end
 local function RoleColor(r) return C[r] or C.Innocent end
 
+--==================================================
 -- KILL TRACKER
-local hitTimestamps = {}
+--==================================================
+local hitTimestamps = {}  -- [player] = os.clock()
 
 local function RegisterHit(player)
     if player and player ~= LP then
@@ -361,7 +368,9 @@ local function WasOurKill(player)
     return (os.clock() - t) < 1.5
 end
 
+--==================================================
 -- ESP
+--==================================================
 local ESPObjects, PlayerConnections = {}, {}
 local lastRoles = {}
 
@@ -473,9 +482,16 @@ end
 local function OnPlayerDied(player)
     if player == LP then return end
     if WasOurKill(player) then
+        -- Kill sound
         PlayKillSound()
-        if Settings.KillNotif then KillNotification(player.DisplayName) end
-        if Settings.KillEffect then ShowKillEffect() end
+        -- Kill notification
+        if Settings.KillNotif then
+            KillNotification(player.DisplayName)
+        end
+        -- Kill effect
+        if Settings.KillEffect then
+            ShowKillEffect()
+        end
     end
     hitTimestamps[player] = nil
 end
@@ -536,6 +552,7 @@ Players.PlayerRemoving:Connect(function(p)
     RemoveESP(p); DisconnectPlayer(p); lastRoles[p] = nil; hitTimestamps[p] = nil
 end)
 
+-- Reattach died listener for existing humanoids
 task.spawn(function()
     task.wait(2)
     for _, p in ipairs(Players:GetPlayers()) do
@@ -576,7 +593,9 @@ task.spawn(function()
     end
 end)
 
--- HUD GUI
+--==================================================
+-- VISUALS: HUD GUI
+--==================================================
 local HudGui = Instance.new("ScreenGui")
 HudGui.Name = "Fondi_Hud"
 HudGui.ResetOnSpawn = false
@@ -585,6 +604,7 @@ HudGui.DisplayOrder = 500
 HudGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 HudGui.Parent = pg
 
+-- Crosshair
 local crosshair = Instance.new("Frame", HudGui)
 crosshair.Size = UDim2.new(0, 20, 0, 20)
 crosshair.Position = UDim2.new(0.5, -10, 0.5, -10)
@@ -615,6 +635,7 @@ crossDot.ZIndex = 100
 
 crosshair.Visible = false
 
+-- Watermark
 local watermark = Instance.new("Frame", HudGui)
 watermark.Size = UDim2.new(0, 220, 0, 26)
 watermark.Position = UDim2.new(0, 12, 0, 12)
@@ -630,7 +651,7 @@ wmLabel.Size = UDim2.new(1, -12, 1, 0)
 wmLabel.Position = UDim2.new(0, 6, 0, 0)
 wmLabel.BackgroundTransparency = 1
 wmLabel.ZIndex = 101
-wmLabel.Text = "FONDI MM2 v11.1 | 60 FPS | 0 ms"
+wmLabel.Text = "FONDI MM2 v11.0 | 60 FPS | 0 ms"
 wmLabel.TextColor3 = C.Text
 wmLabel.Font = Enum.Font.GothamBold
 wmLabel.TextSize = 11
@@ -638,6 +659,7 @@ wmLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 watermark.Visible = false
 
+-- FPS Graph
 local fpsGraphBg = Instance.new("Frame", HudGui)
 fpsGraphBg.Size = UDim2.new(0, 220, 0, 60)
 fpsGraphBg.Position = UDim2.new(0, 12, 0, 44)
@@ -660,6 +682,7 @@ for i = 1, 40 do fpsValues[i] = 60 end
 
 fpsGraphBg.Visible = false
 
+-- Hitmarker
 local hitmarker = Instance.new("Frame", HudGui)
 hitmarker.Size = UDim2.new(0, 30, 0, 30)
 hitmarker.Position = UDim2.new(0.5, -15, 0.5, -15)
@@ -682,6 +705,7 @@ makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(1, -6, 0, 4), -45)
 makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(0, 4, 1, -12), -45)
 makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(1, -6, 1, -12), 45)
 
+-- Kill Notification
 local killNotif = Instance.new("Frame", HudGui)
 killNotif.Size = UDim2.new(0, 320, 0, 50)
 killNotif.Position = UDim2.new(0.5, -160, 0, -70)
@@ -713,7 +737,7 @@ killNotifLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 killNotif.Visible = false
 
-function KillNotification(victimName)
+local function KillNotification(victimName)
     killNotifLabel.Text = "☠  YOU KILLED  " .. victimName
     killNotif.Visible = true
     killNotif.Position = UDim2.new(0.5, -160, 0, -70)
@@ -737,6 +761,7 @@ function KillNotification(victimName)
     end)
 end
 
+-- Kill Effect (flash at center)
 local killEffect = Instance.new("Frame", HudGui)
 killEffect.Size = UDim2.new(0, 200, 0, 200)
 killEffect.Position = UDim2.new(0.5, -100, 0.5, -100)
@@ -746,7 +771,7 @@ killEffect.BorderSizePixel = 0
 killEffect.ZIndex = 250
 Corner(killEffect, 100)
 
-function ShowKillEffect()
+local function ShowKillEffect()
     killEffect.BackgroundTransparency = 0.6
     killEffect.Size = UDim2.new(0, 50, 0, 50)
     killEffect.Position = UDim2.new(0.5, -25, 0.5, -25)
@@ -758,7 +783,8 @@ function ShowKillEffect()
     }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 end
 
-function ShowHitmarker()
+-- Hitmarker function
+local function ShowHitmarker()
     if not Settings.Hitmarker then return end
     hitmarker.Visible = true
     hitmarker.Size = UDim2.new(0, 30, 0, 30)
@@ -780,7 +806,10 @@ function ShowHitmarker()
     end)
 end
 
-function ShowDamageDirection(angle)
+-- Damage Indicator (arrows)
+local damageIndicators = {}
+
+local function ShowDamageDirection(angle)
     if not Settings.DamageIndicator then return end
     local arrow = Instance.new("Frame", HudGui)
     arrow.Size = UDim2.new(0, 30, 0, 30)
@@ -791,6 +820,7 @@ function ShowDamageDirection(angle)
     arrow.ZIndex = 220
     Corner(arrow, 6)
 
+    local radius = 150
     local cx = 0.5 + math.cos(angle) * 0.15
     local cy = 0.5 + math.sin(angle) * 0.15
     arrow.Position = UDim2.new(cx, -15, cy, -15)
@@ -799,6 +829,7 @@ function ShowDamageDirection(angle)
     task.delay(1.05, function() arrow:Destroy() end)
 end
 
+-- Rainbow Trail
 local trailAttachments = {}
 local trailColors = {
     Color3.fromRGB(255, 0, 0),
@@ -845,24 +876,32 @@ local function CreateTrail()
     end
 end
 
+--==================================================
+-- UPDATE LOOPS FOR HUD
+--==================================================
 task.spawn(function()
     while task.wait(0.5) do
+        -- Watermark
         if Settings.Watermark then
             watermark.Visible = true
             local fps = math.floor(1 / RunService.RenderStepped:Wait())
             local ping = 0
             pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-            wmLabel.Text = string.format("FONDI MM2 v11.1 | %d FPS | %d ms", fps, ping)
+            wmLabel.Text = string.format("FONDI MM2 v11.0 | %d FPS | %d ms", fps, ping)
         else
             watermark.Visible = false
         end
 
+        -- FPS Graph
         if Settings.FpsGraph then
             fpsGraphBg.Visible = true
+
+            -- Sample fps
             local fps = math.floor(1 / RunService.RenderStepped:Wait())
             table.remove(fpsValues, 1)
             table.insert(fpsValues, fps)
 
+            -- Redraw bars
             for _, c in ipairs(fpsGraph:GetChildren()) do
                 if c:IsA("Frame") then c:Destroy() end
             end
@@ -883,22 +922,31 @@ task.spawn(function()
             fpsGraphBg.Visible = false
         end
 
+        -- Crosshair
         crosshair.Visible = Settings.Crosshair
 
+        -- Trail
         if Settings.RainbowTrail then
-            if #trailAttachments == 0 then CreateTrail() end
+            if #trailAttachments == 0 then
+                CreateTrail()
+            end
         else
-            if #trailAttachments > 0 then ClearTrail() end
+            if #trailAttachments > 0 then
+                ClearTrail()
+            end
         end
     end
 end)
 
+-- Re-attach trail on respawn
 LP.CharacterAdded:Connect(function()
     task.wait(1)
     if Settings.RainbowTrail then CreateTrail() end
 end)
 
+--==================================================
 -- NOCLIP
+--==================================================
 local noclipConnection = nil
 local function StopNoclip()
     if noclipConnection then noclipConnection:Disconnect(); noclipConnection = nil end
@@ -919,7 +967,9 @@ local function StartNoclip()
     end)
 end
 
+--==================================================
 -- FLY
+--==================================================
 local flyConnection, flyActive = nil, false
 local function StopFly()
     flyActive = false
@@ -946,19 +996,21 @@ local function StartFly()
         local cam = workspace.CurrentCamera
         if not cam then return end
         local move = Vector3.zero
-        if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
         if move.Magnitude > 0 then
             r.CFrame = r.CFrame + (move.Unit * Settings.FlySpeed * dt)
         end
     end)
 end
 
+--==================================================
 -- BHOP
+--==================================================
 local bhopConnection = nil
 local function StopBhop()
     if bhopConnection then bhopConnection:Disconnect(); bhopConnection = nil end
@@ -979,7 +1031,9 @@ local function StartBhop()
     end)
 end
 
+--==================================================
 -- ANTI-FLING
+--==================================================
 local afConnection = nil
 local function StopAntiFling()
     if afConnection then afConnection:Disconnect(); afConnection = nil end
@@ -999,7 +1053,9 @@ local function StartAntiFling()
     end)
 end
 
+--==================================================
 -- AIMBOT
+--==================================================
 local aimbotConnection = nil
 local function StopAimbot()
     if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
@@ -1030,7 +1086,9 @@ local function StartAimbot()
     end)
 end
 
+--==================================================
 -- PICKUP
+--==================================================
 local pickupConnection = nil
 local function StopPickup()
     if pickupConnection then pickupConnection:Disconnect(); pickupConnection = nil end
@@ -1053,7 +1111,9 @@ local function StartPickup()
     end)
 end
 
+--==================================================
 -- KILL ALL
+--==================================================
 local killAllConnection = nil
 local function GetWeapon()
     local c = LP.Character
@@ -1088,7 +1148,9 @@ local function StartKillAll()
     end)
 end
 
+--==================================================
 -- FLING
+--==================================================
 local function FlingPlayer(target)
     if not target or not target.Character then return end
     local tr = target.Character:FindFirstChild("HumanoidRootPart")
@@ -1100,7 +1162,9 @@ local function FlingPlayer(target)
     Notify("FLING → " .. target.DisplayName, C.Pink, 2)
 end
 
+--==================================================
 -- FARM
+--==================================================
 local farmConnection = nil
 local function StopFarm()
     if farmConnection then farmConnection:Disconnect(); farmConnection = nil end
@@ -1124,7 +1188,9 @@ local function StartFarm()
     end)
 end
 
+--==================================================
 -- ANTI-KICK
+--==================================================
 pcall(function()
     local oldKick = hookfunction or hookfunc
     if oldKick and LP.Kick then
@@ -1136,26 +1202,32 @@ pcall(function()
     end
 end)
 
--- DAMAGE DETECTION (БЕЗ continue — для Prometheus)
+--==================================================
+-- DAMAGE DETECTION
+--==================================================
 task.spawn(function()
     while task.wait(0.1) do
-        if IsAuthenticated then
-            local char = LP.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then
-                    local lastHP = hum:GetAttribute("FondiLastHP") or hum.MaxHealth
-                    if hum.Health < lastHP and Settings.DamageIndicator then
-                        ShowDamageDirection(math.random() * math.pi * 2)
-                    end
-                    hum:SetAttribute("FondiLastHP", hum.Health)
-                end
+        if not IsAuthenticated then continue end
+        local char = LP.Character
+        if not char then continue end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health < (hum:GetAttribute("FondiLastHP") or hum.MaxHealth) then
+            -- Damage taken
+            local lastHP = hum:GetAttribute("FondiLastHP") or hum.MaxHealth
+            if hum.Health < lastHP and Settings.DamageIndicator then
+                -- Random angle since we can't know exact source
+                ShowDamageDirection(math.random() * math.pi * 2)
             end
+        end
+        if hum then
+            hum:SetAttribute("FondiLastHP", hum.Health)
         end
     end
 end)
 
+--==================================================
 -- LOADING SCREEN
+--==================================================
 local function ShowLoadingScreen(callback)
     local loadingGui = Instance.new("ScreenGui")
     loadingGui.Name = "FondiLoading"
@@ -1205,7 +1277,7 @@ local function ShowLoadingScreen(callback)
     logo2.Position = UDim2.new(0, 0, 0.4, -5)
     logo2.BackgroundTransparency = 1
     logo2.ZIndex = 5
-    logo2.Text = "MM2 V11.1"
+    logo2.Text = "MM2 V11.0"
     logo2.TextColor3 = C.Accent2
     logo2.Font = Enum.Font.GothamBold
     logo2.TextSize = 16
@@ -1239,7 +1311,7 @@ local function ShowLoadingScreen(callback)
 
     Tween(logo, 0.6, {TextTransparency = 0}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
     Tween(logo2, 0.6, {TextTransparency = 0}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    Tween(barBg, 0.5, {BackgroundTransparency = 0})
+    Tween(barBg, 0.5, {BackgroundTransparency = 0}, nil, nil, 0.5)
     Tween(statusText, 0.6, {TextTransparency = 0})
 
     task.spawn(function()
@@ -1271,7 +1343,9 @@ local function ShowLoadingScreen(callback)
     end)
 end
 
+--==================================================
 -- MAIN UI
+--==================================================
 local MainGui, MainFrame
 
 function BuildUI()
@@ -1320,7 +1394,7 @@ function BuildUI()
     subTitle.Position = UDim2.new(0, 24, 0, 42)
     subTitle.BackgroundTransparency = 1
     subTitle.ZIndex = 12
-    subTitle.Text = "V11.1 • " .. (LP.DisplayName or "User")
+    subTitle.Text = "V11.0 • " .. (LP.DisplayName or "User")
     subTitle.TextColor3 = C.Accent2
     subTitle.Font = Enum.Font.Gotham
     subTitle.TextSize = 11
@@ -1425,16 +1499,24 @@ function BuildUI()
         currentTab = id
         for tid, btn in pairs(tabButtons) do
             local isActive = (tid == id)
-            Tween(btn, 0.25, {TextColor3 = isActive and C.Text or C.SubText})
-            if tabContents[tid] then tabContents[tid].Visible = isActive end
+            Tween(btn, 0.25, {
+                TextColor3 = isActive and C.Text or C.SubText
+            })
+            if tabContents[tid] then
+                tabContents[tid].Visible = isActive
+            end
         end
+
         local activeBtn = tabButtons[id]
         if activeBtn then
             Tween(indicator, 0.3, {
                 Position = UDim2.new(0, activeBtn.AbsolutePosition.X - tabBar.AbsolutePosition.X, 1, -4),
                 Size = UDim2.new(0, activeBtn.AbsoluteSize.X, 0, 3)
             }, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-            if tabContents[id] then tabContents[id].Visible = true end
+
+            if tabContents[id] then
+                tabContents[id].Visible = true
+            end
         end
     end
 
@@ -1869,7 +1951,9 @@ function BuildUI()
     }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 end
 
+--==================================================
 -- HOTKEYS
+--==================================================
 local function ToggleMenu()
     if not MainGui or not MainGui.Parent then return end
     if not MainFrame.Visible then
@@ -1914,7 +1998,9 @@ UIS.InputBegan:Connect(function(input, gp)
     end
 end)
 
+--==================================================
 -- KEY GUI
+--==================================================
 local KeyGui = Instance.new("ScreenGui")
 KeyGui.Name = "FondiKeyGui"
 KeyGui.ResetOnSpawn = false
@@ -1948,7 +2034,7 @@ keySub.Size = UDim2.new(1, 0, 0, 18)
 keySub.Position = UDim2.new(0, 0, 0, 78)
 keySub.BackgroundTransparency = 1
 keySub.ZIndex = 15
-keySub.Text = "V11.1 • VISUALS"
+keySub.Text = "V11.0 • VISUALS"
 keySub.TextColor3 = C.Accent2
 keySub.Font = Enum.Font.GothamBold
 keySub.TextSize = 11
@@ -2187,7 +2273,9 @@ GetScriptBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+--==================================================
 -- AUTOLOGIN
+--==================================================
 task.spawn(function()
     task.wait(0.5)
     local saved = LoadKey()
@@ -2215,6 +2303,6 @@ do
 end
 
 print("==========================================")
-print("[FONDI MM2 V11.1] VISUALS READY")
+print("[FONDI MM2 V11.0] VISUALS READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
