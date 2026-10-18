@@ -1,15 +1,9 @@
 --[[
-    FONDI MM2 V11.3 // NETWORK EDITION
-    - Fix Fling: prediction + попытка SetNetworkOwner
-    - Silent Aim (namecall hook)
-    - Radar / Minimap
-    - Item ESP (Knife/Gun/Coins)
-    - Kill Feed
-    - Config Save/Load
-    - Fix Damage Indicator (реальное направление)
-    - Fix Anti-Fling threshold
-    - Fix FlingAll (массив флингов)
-    - Все фичи V11.2 сохранены
+    FONDI MM2 V11.3 // REAL EDITION
+    - Убрана авторизация через сайт
+    - Убран запрос ключа
+    - Совместимость с инжектором Real
+    - Загрузочный экран + меню
 ]]
 
 local Players = game:GetService("Players")
@@ -24,16 +18,9 @@ local Workspace = game:GetService("Workspace")
 local LP = Players.LocalPlayer
 local pg = LP:WaitForChild("PlayerGui")
 
-local AUTH_URL = "https://fondi-mm-2-auntification.vercel.app/api/validate"
-local GENERATE_URL = "https://fondi-mm-2-auntification.vercel.app/api/generate"
-local KEY_FILE = "fondi_key.txt"
-local LANG_FILE = "fondi_lang.txt"
 local CONFIG_FILE = "fondi_config.json"
-
 local VERSION = "V11.3"
-
-local IsAuthenticated = false
-local Lang = "ru"
+local IsAuthenticated = true  -- всегда true, без ключа
 
 local DefaultSettings = {
     ESP=false, Outline=true, Tracers=true, ShowNames=true, ShowRoles=true,
@@ -71,74 +58,6 @@ local C = {
     Purple2  = Color3.fromRGB(168, 85, 247)
 }
 
-local I18N = {
-    ru = {
-        menu="FONDI MM2", esp="ESP", outline="Контур", tracers="Трассеры",
-        names="Имена", roles="Роли", fly="Полёт", noclip="Noclip",
-        bhop="Bhop", antifling="Anti-Fling", aimbot="Aimbot",
-        silentaim="Silent Aim", killall="Kill All", pickup="Auto-Pickup",
-        reveal="Reveal Murderer", range="Радиус", farm="Farm", notif="Уведомления",
-        flingTitle="FLING", flingBtn="ВЫБРОСИТЬ", flingAll="ВЫБРОСИТЬ ВСЕХ",
-        flingSpeed="Скорость", flingSpin="Вращение",
-        flingNetOwner="Network Owner", flingPredict="Prediction",
-        playerList="СПИСОК ИГРОКОВ",
-        keyInput="Введите ключ", keyInvalid="Неверный ключ",
-        activate="АКТИВИРОВАТЬ", checking="ПРОВЕРКА...", autologin="АВТОВХОД...",
-        genTitle="Генерация ключа", generate="СГЕНЕРИРОВАТЬ",
-        generating="ГЕНЕРАЦИЯ...", done="ГОТОВО",
-        copyKey="СКОПИРОВАТЬ", copied="СКОПИРОВАНО",
-        getScript="ССЫЛКА", linkCopied="Ссылка скопирована!",
-        accessGranted="Доступ разрешён", autologinOk="Автовход выполнен",
-        keyCreated="Ключ создан", keyCopiedMsg="Ключ скопирован!",
-        noKey="Нет ключа", noPlayers="Нет игроков", invalidKey="Неверный ключ",
-        langBtn="EN", becameM=" стал MURDERER", becameS=" стал SHERIFF",
-        catMain="ГЛАВНОЕ", catMove="ДВИЖЕНИЕ", catCombat="БОЙ",
-        catFarm="ФАРМ", catMisc="РАЗНОЕ", catVisual="ВИЗУАЛЫ",
-        selectPlayer="ВЫБРАТЬ ИГРОКА", selected="ВЫБРАН: ",
-        loading="ЗАГРУЗКА", ready="ГОТОВО",
-        visKillSound="Звук убийства", visHitmarker="Хитмаркер",
-        visDamage="Индикатор урона", visWatermark="Watermark",
-        visFps="График FPS", visCrosshair="Прицел",
-        visKillEffect="Эффект убийства", visKillNotif="Уведомление убийства",
-        visTrail="Радужный след", visRadar="Радар", visItemESP="ESP предметов",
-        visKillFeed="Лог убийств",
-        saveCfg="СОХРАНИТЬ", loadCfg="ЗАГРУЗИТЬ", cfgSaved="Конфиг сохранён", cfgLoaded="Конфиг загружен"
-    },
-    en = {
-        menu="FONDI MM2", esp="ESP", outline="Outline", tracers="Tracers",
-        names="Names", roles="Roles", fly="Fly", noclip="Noclip",
-        bhop="Bhop", antifling="Anti-Fling", aimbot="Aimbot",
-        silentaim="Silent Aim", killall="Kill All", pickup="Auto-Pickup",
-        reveal="Reveal Murderer", range="Range", farm="Farm", notif="Notifications",
-        flingTitle="FLING", flingBtn="FLING", flingAll="FLING ALL",
-        flingSpeed="Speed", flingSpin="Spin",
-        flingNetOwner="Network Owner", flingPredict="Prediction",
-        playerList="PLAYER LIST",
-        keyInput="Enter key", keyInvalid="Invalid key",
-        activate="ACTIVATE", checking="CHECKING...", autologin="AUTO-LOGIN...",
-        genTitle="Generate key", generate="GENERATE",
-        generating="GENERATING...", done="DONE",
-        copyKey="COPY", copied="COPIED",
-        getScript="LINK", linkCopied="Link copied!",
-        accessGranted="Access granted", autologinOk="Auto-login OK",
-        keyCreated="Key created", keyCopiedMsg="Key copied!",
-        noKey="No key", noPlayers="No players", invalidKey="Invalid key",
-        langBtn="RU", becameM=" became MURDERER", becameS=" became SHERIFF",
-        catMain="MAIN", catMove="MOVEMENT", catCombat="COMBAT",
-        catFarm="FARM", catMisc="MISC", catVisual="VISUALS",
-        selectPlayer="SELECT PLAYER", selected="SELECTED: ",
-        loading="LOADING", ready="READY",
-        visKillSound="Kill Sound", visHitmarker="Hitmarker",
-        visDamage="Damage Indicator", visWatermark="Watermark",
-        visFps="FPS Graph", visCrosshair="Crosshair",
-        visKillEffect="Kill Effect", visKillNotif="Kill Notification",
-        visTrail="Rainbow Trail", visRadar="Radar", visItemESP="Item ESP",
-        visKillFeed="Kill Feed",
-        saveCfg="SAVE", loadCfg="LOAD", cfgSaved="Config saved", cfgLoaded="Config loaded"
-    }
-}
-local function T(k) return (I18N[Lang] and I18N[Lang][k]) or k end
-
 local function Corner(p, r)
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, r or 8)
@@ -160,9 +79,7 @@ local function Tween(o, t, props, style, dir)
     return tw
 end
 
---==================================================
--- CONFIG SAVE/LOAD
---==================================================
+-- CONFIG SAVE/LOAD (без ключа)
 local function SaveConfig()
     pcall(function()
         if writefile then
@@ -181,72 +98,11 @@ local function LoadConfig()
     end)
 end
 
---==================================================
--- HTTP / AUTH
---==================================================
-local function HttpPost(url, body)
-    local json = HttpService:JSONEncode(body)
-    local ok, result = pcall(function()
-        if request then
-            return request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json})
-        elseif syn and syn.request then
-            return syn.request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json})
-        elseif http_request then
-            return http_request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json})
-        elseif fluxus and fluxus.request then
-            return fluxus.request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=json})
-        else error("No HTTP") end
-    end)
-    if not ok or not result then return nil, "HTTP failed" end
-    local ok2, data = pcall(function() return HttpService:JSONDecode(result.Body or result) end)
-    if not ok2 then return nil, "Invalid JSON" end
-    return data
-end
-
-local function GetHWID()
-    local ok, h = pcall(function()
-        if gethwid then return gethwid() end
-        if syn and syn.get_hwid then return syn.get_hwid() end
-        return tostring(LP.UserId)
-    end)
-    return ok and h or tostring(LP.UserId)
-end
-
-local function ValidateKey(key)
-    local data, err = HttpPost(AUTH_URL, {key=key, userId=tostring(LP.UserId), hwid=GetHWID(), lang=Lang})
-    if not data then return false, err end
-    if data.valid then return true, data end
-    return false, data.reason or T("invalidKey")
-end
-
-local function GenerateKeyRemote(dur)
-    local data, err = HttpPost(GENERATE_URL, {duration=dur, userId=tostring(LP.UserId), lang=Lang})
-    if not data then return nil, err end
-    if data.error then return nil, data.error end
-    return data.key, data
-end
-
-local function SaveKey(k) pcall(function() if writefile then writefile(KEY_FILE, k) end end) end
-local function LoadKey()
-    local ok, c = pcall(function() if readfile and isfile and isfile(KEY_FILE) then return readfile(KEY_FILE) end end)
-    if ok and c and c ~= "" then return c end
-end
-local function ClearKey() pcall(function() if delfile and isfile and isfile(KEY_FILE) then delfile(KEY_FILE) end end) end
-local function SaveLang(l) pcall(function() if writefile then writefile(LANG_FILE, l) end end) end
-local function LoadLang()
-    local ok, c = pcall(function() if readfile and isfile and isfile(LANG_FILE) then return readfile(LANG_FILE) end end)
-    if ok and (c == "ru" or c == "en") then return c end
-end
-
---==================================================
 -- NOTIFY
---==================================================
 local lastNotifyTime = 0
 local function Notify(text, color, duration)
-    -- rate limit 0.3s
     if os.clock() - lastNotifyTime < 0.3 then return end
     lastNotifyTime = os.clock()
-
     duration = duration or 3
     local sg = pg:FindFirstChild("Fondi_Notify")
     if not sg then
@@ -384,9 +240,7 @@ local function PlayKillSound()
     end)
 end
 
---==================================================
 -- ROLE
---==================================================
 local function GetRole(player)
     if not player then return "Innocent" end
     local char = player.Character
@@ -398,9 +252,7 @@ local function GetRole(player)
 end
 local function RoleColor(r) return C[r] or C.Innocent end
 
---==================================================
 -- KILL TRACKER
---==================================================
 local hitTimestamps = {}
 
 local function RegisterHit(player)
@@ -415,9 +267,7 @@ local function WasOurKill(player)
     return (os.clock() - t) < 1.5
 end
 
---==================================================
 -- KILL FEED
---==================================================
 local killFeedEntries = {}
 local KillFeedGui, KillFeedContainer
 
@@ -486,9 +336,7 @@ local function AddKillFeed(killer, victim)
     end)
 end
 
---==================================================
--- SILENT AIM (namecall hook)
---==================================================
+-- SILENT AIM (namecall hook) — совместимо с Real
 local SilentAimTarget = nil
 
 local function GetClosestEnemy(maxDist)
@@ -532,7 +380,6 @@ local function InstallSilentAim()
                     local head = SilentAimTarget.Character:FindFirstChild("Head")
                     if head then
                         local args = {...}
-                        -- заменяем первый аргумент (обычно позиция/объект) на цель
                         if #args >= 1 then
                             args[1] = head
                         end
@@ -547,9 +394,7 @@ local function InstallSilentAim()
     setreadonly(mt, true)
 end
 
---==================================================
 -- ESP
---==================================================
 local ESPObjects, PlayerConnections = {}, {}
 local lastRoles = {}
 
@@ -660,14 +505,11 @@ end
 
 local function OnPlayerDied(player, killer)
     if player == LP then return end
-
-    -- Kill Feed
     if killer then
         AddKillFeed(killer.DisplayName or "?", player.DisplayName or "?")
     else
         AddKillFeed("?", player.DisplayName or "?")
     end
-
     if WasOurKill(player) then
         PlayKillSound()
         if Settings.KillNotif then
@@ -738,34 +580,30 @@ end)
 
 task.spawn(function()
     while task.wait(0.4) do
-        if IsAuthenticated then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LP and p.Parent then
-                    if Settings.RevealMurderer then
-                        local role = GetRole(p)
-                        if role ~= lastRoles[p] then
-                            lastRoles[p] = role
-                            if role == "Murderer" then Notify(p.DisplayName .. T("becameM"), C.Murderer, 4)
-                            elseif role == "Sheriff" then Notify(p.DisplayName .. T("becameS"), C.Sheriff, 4) end
-                        end
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LP and p.Parent then
+                if Settings.RevealMurderer then
+                    local role = GetRole(p)
+                    if role ~= lastRoles[p] then
+                        lastRoles[p] = role
+                        if role == "Murderer" then Notify(p.DisplayName .. " стал MURDERER", C.Murderer, 4)
+                        elseif role == "Sheriff" then Notify(p.DisplayName .. " стал SHERIFF", C.Sheriff, 4) end
                     end
-                    if Settings.ESP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                        local d = ESPObjects[p]
-                        if not d or d.Character ~= p.Character
-                            or not d.Highlight or not d.Highlight.Parent
-                            or not d.Billboard or not d.Billboard.Parent then
-                            CreateESP(p)
-                        else UpdateESP(p) end
-                    end
+                end
+                if Settings.ESP and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local d = ESPObjects[p]
+                    if not d or d.Character ~= p.Character
+                        or not d.Highlight or not d.Highlight.Parent
+                        or not d.Billboard or not d.Billboard.Parent then
+                        CreateESP(p)
+                    else UpdateESP(p) end
                 end
             end
         end
     end
 end)
 
---==================================================
 -- ITEM ESP
---==================================================
 local ItemESPObjects = {}
 
 local function ClearItemESP()
@@ -807,7 +645,6 @@ end
 
 task.spawn(function()
     while task.wait(1) do
-        if not IsAuthenticated then continue end
         if not Settings.ItemESP then
             if next(ItemESPObjects) then ClearItemESP() end
             continue
@@ -827,9 +664,7 @@ task.spawn(function()
     end
 end)
 
---==================================================
 -- RADAR
---==================================================
 local RadarGui, RadarFrame, RadarDotContainer
 local RADAR_SIZE = 150
 local RADAR_RANGE = 200
@@ -895,7 +730,6 @@ local function UpdateRadar()
     local center = Vector2.new(RADAR_SIZE/2, RADAR_SIZE/2)
     local scale = (RADAR_SIZE/2) / RADAR_RANGE
 
-    -- очистка мёртвых
     for pl, dot in pairs(radarDots) do
         if not pl.Parent or not pl.Character then
             if dot then dot:Destroy() end
@@ -909,11 +743,10 @@ local function UpdateRadar()
             if root then
                 local rel = myCF:PointToObjectSpace(root.Position)
                 local dx = rel.X * scale
-                local dz = -rel.Z * scale  -- Z инвертируем
+                local dz = -rel.Z * scale
 
                 local dist = math.sqrt(dx*dx + dz*dz)
                 if dist > RADAR_SIZE/2 - 4 then
-                    -- выходит за границы — не рисуем
                     if radarDots[pl] then radarDots[pl].Visible = false end
                 else
                     local dot = radarDots[pl]
@@ -933,7 +766,6 @@ local function UpdateRadar()
         end
     end
 
-    -- игрок в центре
     if not radarDots[LP] then
         local me = Instance.new("Frame", RadarDotContainer)
         me.Size = UDim2.new(0, 6, 0, 6)
@@ -946,9 +778,7 @@ local function UpdateRadar()
     radarDots[LP].Position = UDim2.new(0, center.X - 3, 0, center.Y - 3)
 end
 
---==================================================
--- VISUALS: HUD GUI
---==================================================
+-- VISUALS: HUD
 local HudGui = Instance.new("ScreenGui")
 HudGui.Name = "Fondi_Hud"
 HudGui.ResetOnSpawn = false
@@ -957,7 +787,6 @@ HudGui.DisplayOrder = 500
 HudGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 HudGui.Parent = pg
 
--- Crosshair
 local crosshair = Instance.new("Frame", HudGui)
 crosshair.Size = UDim2.new(0, 20, 0, 20)
 crosshair.Position = UDim2.new(0.5, -10, 0.5, -10)
@@ -988,7 +817,6 @@ crossDot.ZIndex = 100
 
 crosshair.Visible = false
 
--- Watermark
 local watermark = Instance.new("Frame", HudGui)
 watermark.Size = UDim2.new(0, 260, 0, 26)
 watermark.Position = UDim2.new(0, 12, 0, 12)
@@ -1012,7 +840,6 @@ wmLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 watermark.Visible = false
 
--- FPS Graph
 local fpsGraphBg = Instance.new("Frame", HudGui)
 fpsGraphBg.Size = UDim2.new(0, 220, 0, 60)
 fpsGraphBg.Position = UDim2.new(0, 12, 0, 44)
@@ -1030,7 +857,6 @@ fpsGraph.BackgroundTransparency = 1
 fpsGraph.ClipsDescendants = true
 fpsGraph.ZIndex = 101
 
--- пул баров
 local FPS_BARS = 40
 local fpsBars = {}
 for i = 1, FPS_BARS do
@@ -1049,7 +875,6 @@ local fpsFrames = 0
 
 fpsGraphBg.Visible = false
 
--- Hitmarker
 local hitmarker = Instance.new("Frame", HudGui)
 hitmarker.Size = UDim2.new(0, 30, 0, 30)
 hitmarker.Position = UDim2.new(0.5, -15, 0.5, -15)
@@ -1072,7 +897,6 @@ makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(1, -6, 0, 4), -45)
 makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(0, 4, 1, -12), -45)
 makeHitLine(UDim2.new(0, 2, 0, 8), UDim2.new(1, -6, 1, -12), 45)
 
--- Kill Notification
 local killNotif = Instance.new("Frame", HudGui)
 killNotif.Size = UDim2.new(0, 320, 0, 50)
 killNotif.Position = UDim2.new(0.5, -160, 0, -70)
@@ -1128,7 +952,6 @@ function KillNotification(victimName)
     end)
 end
 
--- Kill Effect
 local killEffect = Instance.new("Frame", HudGui)
 killEffect.Size = UDim2.new(0, 200, 0, 200)
 killEffect.Position = UDim2.new(0.5, -100, 0.5, -100)
@@ -1172,7 +995,6 @@ function ShowHitmarker()
     end)
 end
 
--- Damage Indicator (fix: реальное направление)
 local function GetAttackerDirection()
     local myChar = LP.Character
     if not myChar then return 0 end
@@ -1216,7 +1038,6 @@ local function ShowDamageDirection(angle)
     task.delay(1.05, function() arrow:Destroy() end)
 end
 
--- Rainbow Trail
 local trailAttachments = {}
 local trailColors = {
     Color3.fromRGB(255, 0, 0),
@@ -1263,9 +1084,6 @@ local function CreateTrail()
     end
 end
 
---==================================================
--- UPDATE LOOP FOR HUD
---==================================================
 RunService.RenderStepped:Connect(function(dt)
     fpsAccum = fpsAccum + dt
     fpsFrames = fpsFrames + 1
@@ -1321,9 +1139,7 @@ LP.CharacterAdded:Connect(function()
     if Settings.RainbowTrail then CreateTrail() end
 end)
 
---==================================================
 -- NOCLIP
---==================================================
 local noclipConnection = nil
 local function StopNoclip()
     if noclipConnection then noclipConnection:Disconnect(); noclipConnection = nil end
@@ -1335,7 +1151,7 @@ end
 local function StartNoclip()
     StopNoclip()
     noclipConnection = RunService.Stepped:Connect(function()
-        if not IsAuthenticated or not Settings.Noclip then return end
+        if not Settings.Noclip then return end
         local c = LP.Character
         if not c then return end
         for _, o in ipairs(c:GetDescendants()) do
@@ -1344,9 +1160,7 @@ local function StartNoclip()
     end)
 end
 
---==================================================
 -- FLY
---==================================================
 local flyConnection, flyActive = nil, false
 local function StopFly()
     flyActive = false
@@ -1361,7 +1175,7 @@ local function StartFly()
     StopFly()
     flyActive = true
     flyConnection = RunService.RenderStepped:Connect(function(dt)
-        if not IsAuthenticated or not Settings.Fly or not flyActive then return end
+        if not Settings.Fly or not flyActive then return end
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
@@ -1385,9 +1199,7 @@ local function StartFly()
     end)
 end
 
---==================================================
 -- BHOP
---==================================================
 local bhopConnection = nil
 local function StopBhop()
     if bhopConnection then bhopConnection:Disconnect(); bhopConnection = nil end
@@ -1395,7 +1207,7 @@ end
 local function StartBhop()
     StopBhop()
     bhopConnection = RunService.Heartbeat:Connect(function()
-        if not IsAuthenticated or not Settings.Bhop then return end
+        if not Settings.Bhop then return end
         if not UIS:IsKeyDown(Enum.KeyCode.Space) then return end
         local c = LP.Character
         if not c then return end
@@ -1408,9 +1220,7 @@ local function StartBhop()
     end)
 end
 
---==================================================
--- ANTI-FLING (fix threshold)
---==================================================
+-- ANTI-FLING
 local afConnection = nil
 local function StopAntiFling()
     if afConnection then afConnection:Disconnect(); afConnection = nil end
@@ -1418,12 +1228,11 @@ end
 local function StartAntiFling()
     StopAntiFling()
     afConnection = RunService.Heartbeat:Connect(function()
-        if not IsAuthenticated or not Settings.AntiFling then return end
+        if not Settings.AntiFling then return end
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
         if not r then return end
-        -- понижен порог: 80 / 30
         if r.Velocity.Magnitude > 80 or r.RotVelocity.Magnitude > 30 then
             r.Velocity = Vector3.zero
             r.RotVelocity = Vector3.zero
@@ -1431,9 +1240,7 @@ local function StartAntiFling()
     end)
 end
 
---==================================================
 -- AIMBOT
---==================================================
 local aimbotConnection = nil
 local function StopAimbot()
     if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
@@ -1441,7 +1248,7 @@ end
 local function StartAimbot()
     StopAimbot()
     aimbotConnection = RunService.RenderStepped:Connect(function()
-        if not IsAuthenticated or not Settings.Aimbot then return end
+        if not Settings.Aimbot then return end
         if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
         local cam = Workspace.CurrentCamera
         if not cam then return end
@@ -1464,9 +1271,7 @@ local function StartAimbot()
     end)
 end
 
---==================================================
 -- AUTO-PICKUP
---==================================================
 local pickupConnection = nil
 local function StopPickup()
     if pickupConnection then pickupConnection:Disconnect(); pickupConnection = nil end
@@ -1475,7 +1280,7 @@ end
 local function StartPickup()
     StopPickup()
     pickupConnection = RunService.Heartbeat:Connect(function()
-        if not IsAuthenticated or not Settings.AutoPickup then return end
+        if not Settings.AutoPickup then return end
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
@@ -1508,9 +1313,7 @@ local function StartPickup()
     end)
 end
 
---==================================================
 -- KILL ALL
---==================================================
 local killAllConnection = nil
 local lastKillTime = 0
 
@@ -1532,7 +1335,7 @@ end
 local function StartKillAll()
     StopKillAll()
     killAllConnection = RunService.Heartbeat:Connect(function()
-        if not IsAuthenticated or not Settings.KillAll then return end
+        if not Settings.KillAll then return end
         if os.clock() - lastKillTime < 0.2 then return end
 
         local c = LP.Character
@@ -1557,7 +1360,6 @@ local function StartKillAll()
         local tr = target.Character.HumanoidRootPart
         local th = target.Character:FindFirstChildOfClass("Humanoid")
 
-        -- телепорт вплотную + атака
         r.CFrame = CFrame.new(tr.Position - tr.CFrame.LookVector * 2 + Vector3.new(0, 1, 0),
                               Vector3.new(tr.Position.X, r.Position.Y, tr.Position.Z))
 
@@ -1565,7 +1367,6 @@ local function StartKillAll()
         if w then
             pcall(function() w:Activate() end)
         end
-        -- fallback: прямое убийство через Health (работает если сервер не валидирует)
         if th then
             pcall(function()
                 local killer = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
@@ -1581,11 +1382,9 @@ local function StartKillAll()
     end)
 end
 
---==================================================
--- FLING (V11.3: Network Owner + Prediction)
---==================================================
-local activeFlings = {}  -- [player] = connection
-local flingParams = {}   -- [player] = {target, startTime}
+-- FLING
+local activeFlings = {}
+local flingParams = {}
 
 local function StopFlingFor(targetPlayer)
     local con = activeFlings[targetPlayer]
@@ -1610,7 +1409,6 @@ local function StopAllFlings()
     end
 end
 
--- Пытаемся забрать network ownership у цели (работает только если executor имеет доступ)
 local function TrySetNetworkOwner(targetRoot)
     if not Settings.FlingUseNetworkOwner then return false end
     local ok = pcall(function()
@@ -1638,7 +1436,6 @@ local function StartFling(target)
     local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
     if not targetRoot then return end
 
-    -- Network owner attempt
     local netOwned = TrySetNetworkOwner(targetRoot)
 
     flingParams[target] = {startTime = os.clock(), netOwned = netOwned}
@@ -1647,7 +1444,6 @@ local function StartFling(target)
         local params = flingParams[target]
         if not params then StopFlingFor(target) return end
         if os.clock() - params.startTime > 5 then
-            -- возвращаем владельца
             pcall(function()
                 if targetRoot and targetRoot.Parent then
                     targetRoot:SetNetworkOwner(target)
@@ -1671,34 +1467,25 @@ local function StartFling(target)
         myH.PlatformStand = true
         myH.AutoRotate = false
 
-        -- Prediction: учитываем velocity цели
         local predictedPos = tR.Position
         if Settings.FlingPrediction then
             local tv = tR.AssemblyLinearVelocity
-            predictedPos = tR.Position + tv * 0.15  -- на 150мс вперёд
+            predictedPos = tR.Position + tv * 0.15
         end
 
         local dir = (predictedPos - myR.Position)
         local dist = dir.Magnitude
         if dist < 0.01 then dir = Vector3.new(1,0,0) else dir = dir.Unit end
 
-        -- Телепорт вплотную
         myR.CFrame = CFrame.new(predictedPos - dir * 2 + Vector3.new(0, 1, 0), predictedPos)
-
-        -- Импульс
         myR.AssemblyLinearVelocity = dir * Settings.FlingSpeed
-
-        -- Огромная угловая скорость
         myR.AssemblyAngularVelocity = Vector3.new(
             Settings.FlingSpin, Settings.FlingSpin, Settings.FlingSpin
         )
-
-        -- Микротолчки
         myR.AssemblyLinearVelocity = myR.AssemblyLinearVelocity + Vector3.new(
             math.random(-30, 30), math.random(-30, 30), math.random(-30, 30)
         )
 
-        -- Если удалось забрать network ownership — долбим цель напрямую
         if params.netOwned then
             pcall(function()
                 tR.AssemblyLinearVelocity = Vector3.new(
@@ -1722,9 +1509,7 @@ local function FlingAll()
     end
 end
 
---==================================================
 -- FARM
---==================================================
 local farmConnection = nil
 local function StopFarm()
     if farmConnection then farmConnection:Disconnect(); farmConnection = nil end
@@ -1732,7 +1517,7 @@ end
 local function StartFarm()
     StopFarm()
     farmConnection = RunService.Heartbeat:Connect(function()
-        if not IsAuthenticated or not Settings.Farm then return end
+        if not Settings.Farm then return end
         local c = LP.Character
         if not c then return end
         local r = c:FindFirstChild("HumanoidRootPart")
@@ -1748,9 +1533,7 @@ local function StartFarm()
     end)
 end
 
---==================================================
 -- ANTI-KICK
---==================================================
 pcall(function()
     if hookfunction and LP.Kick then
         hookfunction(LP.Kick, function(self, msg)
@@ -1760,12 +1543,9 @@ pcall(function()
     end
 end)
 
---==================================================
--- DAMAGE DETECTION (fix: реальное направление)
---==================================================
+-- DAMAGE DETECTION
 task.spawn(function()
     while task.wait(0.1) do
-        if not IsAuthenticated then continue end
         local char = LP.Character
         if not char then continue end
         local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1781,9 +1561,7 @@ task.spawn(function()
     end
 end)
 
---==================================================
 -- LOADING SCREEN
---==================================================
 local function ShowLoadingScreen(callback)
     local loadingGui = Instance.new("ScreenGui")
     loadingGui.Name = "FondiLoading"
@@ -1833,7 +1611,7 @@ local function ShowLoadingScreen(callback)
     logo2.Position = UDim2.new(0, 0, 0.4, -5)
     logo2.BackgroundTransparency = 1
     logo2.ZIndex = 5
-    logo2.Text = "MM2 " .. VERSION
+    logo2.Text = "MM2 " .. VERSION .. " • REAL"
     logo2.TextColor3 = C.Accent2
     logo2.Font = Enum.Font.GothamBold
     logo2.TextSize = 16
@@ -1859,7 +1637,7 @@ local function ShowLoadingScreen(callback)
     statusText.Position = UDim2.new(0, 0, 0.6, 15)
     statusText.BackgroundTransparency = 1
     statusText.ZIndex = 5
-    statusText.Text = T("loading") .. "..."
+    statusText.Text = "ЗАГРУЗКА..."
     statusText.TextColor3 = C.SubText
     statusText.Font = Enum.Font.GothamBold
     statusText.TextSize = 11
@@ -1872,10 +1650,10 @@ local function ShowLoadingScreen(callback)
 
     task.spawn(function()
         local stages = {
-            {T("loading") .. " UI...", 25},
-            {T("loading") .. " Visuals...", 55},
-            {T("loading") .. " Functions...", 80},
-            {T("ready") .. "!", 100}
+            {"Загрузка UI...", 25},
+            {"Загрузка визуалов...", 55},
+            {"Загрузка функций...", 80},
+            {"ГОТОВО!", 100}
         }
         for _, stage in ipairs(stages) do
             statusText.Text = stage[1]
@@ -1899,9 +1677,7 @@ local function ShowLoadingScreen(callback)
     end)
 end
 
---==================================================
 -- MAIN UI
---==================================================
 local MainGui, MainFrame
 
 function BuildUI()
@@ -1954,29 +1730,6 @@ function BuildUI()
     subTitle.Font = Enum.Font.Gotham
     subTitle.TextSize = 11
     subTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-    local langBtn = Instance.new("TextButton", header)
-    langBtn.Size = UDim2.new(0, 46, 0, 30)
-    langBtn.Position = UDim2.new(1, -100, 0, 20)
-    langBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-    langBtn.Text = T("langBtn")
-    langBtn.TextColor3 = C.Accent2
-    langBtn.Font = Enum.Font.GothamBold
-    langBtn.TextSize = 12
-    langBtn.BorderSizePixel = 0
-    langBtn.AutoButtonColor = false
-    langBtn.ZIndex = 12
-    Corner(langBtn, 10)
-    Stroke(langBtn, C.Accent2, 1)
-
-    langBtn.MouseButton1Click:Connect(function()
-        Lang = (Lang == "ru") and "en" or "ru"
-        SaveLang(Lang)
-        PlayClick()
-        BurstFrom(langBtn)
-        if MainGui then pcall(function() MainGui:Destroy() end) end
-        BuildUI()
-    end)
 
     local close = Instance.new("TextButton", header)
     close.Size = UDim2.new(0, 30, 0, 30)
@@ -2033,20 +1786,18 @@ function BuildUI()
     contentArea.ZIndex = 11
 
     local tabData = {
-        {id = "main", label = T("catMain")},
-        {id = "move", label = T("catMove")},
-        {id = "combat", label = T("catCombat")},
-        {id = "visual", label = T("catVisual")},
-        {id = "farm", label = T("catFarm")},
-        {id = "misc", label = T("catMisc")}
+        {id = "main", label = "ГЛАВНОЕ"},
+        {id = "move", label = "ДВИЖЕНИЕ"},
+        {id = "combat", label = "БОЙ"},
+        {id = "visual", label = "ВИЗУАЛЫ"},
+        {id = "farm", label = "ФАРМ"},
+        {id = "misc", label = "РАЗНОЕ"}
     }
 
     local tabButtons = {}
     local tabContents = {}
-    local currentTab = "main"
 
     local function ShowTab(id)
-        currentTab = id
         for tid, btn in pairs(tabButtons) do
             local isActive = (tid == id)
             Tween(btn, 0.25, {
@@ -2229,7 +1980,7 @@ function BuildUI()
     end
 
     -- MAIN TAB
-    CreateToggle(tabContents["main"], T("esp"), "ESP", C.Accent, function(on)
+    CreateToggle(tabContents["main"], "ESP", "ESP", C.Accent, function(on)
         if on then
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LP then CreateESP(p) end
@@ -2238,43 +1989,43 @@ function BuildUI()
             for p, _ in pairs(ESPObjects) do RemoveESP(p) end
         end
     end)
-    CreateToggle(tabContents["main"], T("outline"), "Outline", C.Accent2)
-    CreateToggle(tabContents["main"], T("tracers"), "Tracers", C.Pink)
-    CreateToggle(tabContents["main"], T("names"), "ShowNames", Color3.fromRGB(150, 200, 255))
-    CreateToggle(tabContents["main"], T("roles"), "ShowRoles", C.Purple2)
-    CreateToggle(tabContents["main"], T("reveal"), "RevealMurderer", C.Murderer)
+    CreateToggle(tabContents["main"], "Контур", "Outline", C.Accent2)
+    CreateToggle(tabContents["main"], "Трассеры", "Tracers", C.Pink)
+    CreateToggle(tabContents["main"], "Имена", "ShowNames", Color3.fromRGB(150, 200, 255))
+    CreateToggle(tabContents["main"], "Роли", "ShowRoles", C.Purple2)
+    CreateToggle(tabContents["main"], "Reveal Murderer", "RevealMurderer", C.Murderer)
 
     -- MOVE TAB
-    CreateToggle(tabContents["move"], T("fly"), "Fly", C.Blue, function(on)
+    CreateToggle(tabContents["move"], "Полёт", "Fly", C.Blue, function(on)
         if on then StartFly() else StopFly() end
     end)
     CreateSlider(tabContents["move"], "Fly Speed", 20, 150, Settings.FlySpeed, C.Blue, function(v)
         Settings.FlySpeed = v
     end)
-    CreateToggle(tabContents["move"], T("noclip"), "Noclip", C.Green, function(on)
+    CreateToggle(tabContents["move"], "Noclip", "Noclip", C.Green, function(on)
         if on then StartNoclip() else StopNoclip() end
     end)
-    CreateToggle(tabContents["move"], T("bhop"), "Bhop", Color3.fromRGB(150, 200, 100), function(on)
+    CreateToggle(tabContents["move"], "Bhop", "Bhop", Color3.fromRGB(150, 200, 100), function(on)
         if on then StartBhop() else StopBhop() end
     end)
-    CreateToggle(tabContents["move"], T("antifling"), "AntiFling", C.Orange, function(on)
+    CreateToggle(tabContents["move"], "Anti-Fling", "AntiFling", C.Orange, function(on)
         if on then StartAntiFling() else StopAntiFling() end
     end)
 
     -- COMBAT TAB
-    CreateToggle(tabContents["combat"], T("aimbot"), "Aimbot", C.Danger, function(on)
+    CreateToggle(tabContents["combat"], "Aimbot", "Aimbot", C.Danger, function(on)
         if on then StartAimbot() else StopAimbot() end
     end)
-    CreateToggle(tabContents["combat"], T("silentaim"), "SilentAim", C.Murderer, function(on)
+    CreateToggle(tabContents["combat"], "Silent Aim", "SilentAim", C.Murderer, function(on)
         if on then InstallSilentAim() end
     end)
-    CreateToggle(tabContents["combat"], T("killall"), "KillAll", C.Pink, function(on)
+    CreateToggle(tabContents["combat"], "Kill All", "KillAll", C.Pink, function(on)
         if on then StartKillAll() else StopKillAll() end
     end)
-    CreateSlider(tabContents["combat"], T("range"), 5, 50, Settings.KillAuraRange, C.Pink, function(v)
+    CreateSlider(tabContents["combat"], "Радиус", 5, 50, Settings.KillAuraRange, C.Pink, function(v)
         Settings.KillAuraRange = v
     end)
-    CreateToggle(tabContents["combat"], T("pickup"), "AutoPickup", Color3.fromRGB(200, 200, 100), function(on)
+    CreateToggle(tabContents["combat"], "Auto-Pickup", "AutoPickup", Color3.fromRGB(200, 200, 100), function(on)
         if on then StartPickup() else StopPickup() end
     end)
 
@@ -2282,26 +2033,26 @@ function BuildUI()
     flingTitle.Size = UDim2.new(1, -5, 0, 20)
     flingTitle.BackgroundTransparency = 1
     flingTitle.ZIndex = 15
-    flingTitle.Text = T("flingTitle")
+    flingTitle.Text = "FLING"
     flingTitle.TextColor3 = C.Accent2
     flingTitle.Font = Enum.Font.GothamBold
     flingTitle.TextSize = 11
     flingTitle.TextXAlignment = Enum.TextXAlignment.Left
 
-    CreateSlider(tabContents["combat"], T("flingSpeed"), 100, 800, Settings.FlingSpeed, C.Danger, function(v)
+    CreateSlider(tabContents["combat"], "Fling Speed", 100, 800, Settings.FlingSpeed, C.Danger, function(v)
         Settings.FlingSpeed = v
     end)
-    CreateSlider(tabContents["combat"], T("flingSpin"), 100, 1500, Settings.FlingSpin, C.Pink, function(v)
+    CreateSlider(tabContents["combat"], "Fling Spin", 100, 1500, Settings.FlingSpin, C.Pink, function(v)
         Settings.FlingSpin = v
     end)
-    CreateToggle(tabContents["combat"], T("flingNetOwner"), "FlingUseNetworkOwner", C.Success)
-    CreateToggle(tabContents["combat"], T("flingPredict"), "FlingPrediction", C.Blue)
+    CreateToggle(tabContents["combat"], "Network Owner", "FlingUseNetworkOwner", C.Success)
+    CreateToggle(tabContents["combat"], "Prediction", "FlingPrediction", C.Blue)
 
     local selectedFlingTarget = nil
     local playerBtn = Instance.new("TextButton", tabContents["combat"])
     playerBtn.Size = UDim2.new(1, -5, 0, 42)
     playerBtn.BackgroundColor3 = Color3.fromRGB(22, 22, 32)
-    playerBtn.Text = T("selectPlayer") .. " ▼"
+    playerBtn.Text = "ВЫБРАТЬ ИГРОКА ▼"
     playerBtn.TextColor3 = C.Text
     playerBtn.Font = Enum.Font.GothamBold
     playerBtn.TextSize = 12
@@ -2346,7 +2097,7 @@ function BuildUI()
                 Corner(row, 6)
                 row.MouseButton1Click:Connect(function()
                     selectedFlingTarget = pl
-                    playerBtn.Text = T("selected") .. pl.DisplayName
+                    playerBtn.Text = "ВЫБРАН: " .. pl.DisplayName
                     dropdown.Visible = false
                     PlayClick()
                 end)
@@ -2363,7 +2114,7 @@ function BuildUI()
     local flingBtn = Instance.new("TextButton", tabContents["combat"])
     flingBtn.Size = UDim2.new(1, -5, 0, 42)
     flingBtn.BackgroundColor3 = C.Danger
-    flingBtn.Text = T("flingBtn")
+    flingBtn.Text = "ВЫБРОСИТЬ"
     flingBtn.TextColor3 = Color3.new(1,1,1)
     flingBtn.Font = Enum.Font.GothamBold
     flingBtn.TextSize = 12
@@ -2381,7 +2132,7 @@ function BuildUI()
     local flingAllBtn = Instance.new("TextButton", tabContents["combat"])
     flingAllBtn.Size = UDim2.new(1, -5, 0, 42)
     flingAllBtn.BackgroundColor3 = Color3.fromRGB(200, 40, 80)
-    flingAllBtn.Text = T("flingAll")
+    flingAllBtn.Text = "ВЫБРОСИТЬ ВСЕХ"
     flingAllBtn.TextColor3 = Color3.new(1,1,1)
     flingAllBtn.Font = Enum.Font.GothamBold
     flingAllBtn.TextSize = 12
@@ -2396,31 +2147,31 @@ function BuildUI()
     end)
 
     -- VISUAL TAB
-    CreateToggle(tabContents["visual"], T("visKillSound"), "KillSound", C.Danger)
-    CreateToggle(tabContents["visual"], T("visHitmarker"), "Hitmarker", C.Accent2)
-    CreateToggle(tabContents["visual"], T("visDamage"), "DamageIndicator", C.Warning)
-    CreateToggle(tabContents["visual"], T("visWatermark"), "Watermark", C.Purple2)
-    CreateToggle(tabContents["visual"], T("visFps"), "FpsGraph", C.Green)
-    CreateToggle(tabContents["visual"], T("visCrosshair"), "Crosshair", C.Accent)
-    CreateToggle(tabContents["visual"], T("visKillEffect"), "KillEffect", C.Pink)
-    CreateToggle(tabContents["visual"], T("visKillNotif"), "KillNotif", C.Blue)
-    CreateToggle(tabContents["visual"], T("visTrail"), "RainbowTrail", C.Orange)
-    CreateToggle(tabContents["visual"], T("visRadar"), "Radar", C.Accent2)
-    CreateToggle(tabContents["visual"], T("visItemESP"), "ItemESP", C.Warning)
-    CreateToggle(tabContents["visual"], T("visKillFeed"), "KillFeed", C.Danger)
+    CreateToggle(tabContents["visual"], "Звук убийства", "KillSound", C.Danger)
+    CreateToggle(tabContents["visual"], "Хитмаркер", "Hitmarker", C.Accent2)
+    CreateToggle(tabContents["visual"], "Индикатор урона", "DamageIndicator", C.Warning)
+    CreateToggle(tabContents["visual"], "Watermark", "Watermark", C.Purple2)
+    CreateToggle(tabContents["visual"], "График FPS", "FpsGraph", C.Green)
+    CreateToggle(tabContents["visual"], "Прицел", "Crosshair", C.Accent)
+    CreateToggle(tabContents["visual"], "Эффект убийства", "KillEffect", C.Pink)
+    CreateToggle(tabContents["visual"], "Уведомление убийства", "KillNotif", C.Blue)
+    CreateToggle(tabContents["visual"], "Радужный след", "RainbowTrail", C.Orange)
+    CreateToggle(tabContents["visual"], "Радар", "Radar", C.Accent2)
+    CreateToggle(tabContents["visual"], "ESP предметов", "ItemESP", C.Warning)
+    CreateToggle(tabContents["visual"], "Лог убийств", "KillFeed", C.Danger)
 
     -- FARM TAB
-    CreateToggle(tabContents["farm"], T("farm"), "Farm", Color3.fromRGB(255, 200, 50), function(on)
+    CreateToggle(tabContents["farm"], "Farm", "Farm", Color3.fromRGB(255, 200, 50), function(on)
         if on then StartFarm() else StopFarm() end
     end)
 
     -- MISC TAB
-    CreateToggle(tabContents["misc"], T("notif"), "Notifications", Color3.fromRGB(100, 200, 255))
+    CreateToggle(tabContents["misc"], "Уведомления", "Notifications", Color3.fromRGB(100, 200, 255))
 
     local saveBtn = Instance.new("TextButton", tabContents["misc"])
     saveBtn.Size = UDim2.new(0.48, -5, 0, 42)
     saveBtn.BackgroundColor3 = C.Success
-    saveBtn.Text = T("saveCfg")
+    saveBtn.Text = "СОХРАНИТЬ"
     saveBtn.TextColor3 = Color3.new(1,1,1)
     saveBtn.Font = Enum.Font.GothamBold
     saveBtn.TextSize = 12
@@ -2432,13 +2183,13 @@ function BuildUI()
         SaveConfig()
         PlayClick()
         BurstFrom(saveBtn)
-        Notify(T("cfgSaved"), C.Success)
+        Notify("Конфиг сохранён", C.Success)
     end)
 
     local loadBtn = Instance.new("TextButton", tabContents["misc"])
     loadBtn.Size = UDim2.new(0.48, -5, 0, 42)
     loadBtn.BackgroundColor3 = C.Blue
-    loadBtn.Text = T("loadCfg")
+    loadBtn.Text = "ЗАГРУЗИТЬ"
     loadBtn.TextColor3 = Color3.new(1,1,1)
     loadBtn.Font = Enum.Font.GothamBold
     loadBtn.TextSize = 12
@@ -2450,7 +2201,7 @@ function BuildUI()
         LoadConfig()
         PlayClick()
         BurstFrom(loadBtn)
-        Notify(T("cfgLoaded"), C.Success)
+        Notify("Конфиг загружен", C.Success)
         if MainGui then pcall(function() MainGui:Destroy() end) end
         BuildUI()
     end)
@@ -2459,7 +2210,7 @@ function BuildUI()
     listTitle.Size = UDim2.new(1, -5, 0, 22)
     listTitle.BackgroundTransparency = 1
     listTitle.ZIndex = 15
-    listTitle.Text = T("playerList")
+    listTitle.Text = "СПИСОК ИГРОКОВ"
     listTitle.TextColor3 = C.SubText
     listTitle.Font = Enum.Font.GothamBold
     listTitle.TextSize = 11
@@ -2517,9 +2268,7 @@ function BuildUI()
     }, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 end
 
---==================================================
 -- HOTKEYS
---==================================================
 local function ToggleMenu()
     if not MainGui or not MainGui.Parent then return end
     if not MainFrame.Visible then
@@ -2544,7 +2293,6 @@ end
 
 UIS.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if not IsAuthenticated then return end
     if input.KeyCode == Enum.KeyCode.L then ToggleMenu()
     elseif input.KeyCode == Enum.KeyCode.F then
         Settings.Fly = not Settings.Fly
@@ -2564,323 +2312,19 @@ UIS.InputBegan:Connect(function(input, gp)
     end
 end)
 
---==================================================
 -- INIT EXTRAS
---==================================================
 InitKillFeed()
 InitRadar()
+LoadConfig()
 
---==================================================
--- KEY GUI
---==================================================
-local KeyGui = Instance.new("ScreenGui")
-KeyGui.Name = "FondiKeyGui"
-KeyGui.ResetOnSpawn = false
-KeyGui.IgnoreGuiInset = true
-KeyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-KeyGui.Parent = pg
-
-local KeyFrame = Instance.new("Frame", KeyGui)
-KeyFrame.Size = UDim2.new(0, 420, 0, 550)
-KeyFrame.Position = UDim2.new(0.5, -210, 0.5, -275)
-KeyFrame.BackgroundColor3 = C.Card
-KeyFrame.BackgroundTransparency = 0.02
-KeyFrame.BorderSizePixel = 0
-KeyFrame.Active = true
-KeyFrame.ZIndex = 10
-Corner(KeyFrame, 20)
-Stroke(KeyFrame, C.Accent, 1.5)
-
-local keyLogo = Instance.new("TextLabel", KeyFrame)
-keyLogo.Size = UDim2.new(1, 0, 0, 50)
-keyLogo.Position = UDim2.new(0, 0, 0, 30)
-keyLogo.BackgroundTransparency = 1
-keyLogo.ZIndex = 15
-keyLogo.Text = "FONDI MM2"
-keyLogo.TextColor3 = C.Text
-keyLogo.Font = Enum.Font.GothamBold
-keyLogo.TextSize = 28
-
-local keySub = Instance.new("TextLabel", KeyFrame)
-keySub.Size = UDim2.new(1, 0, 0, 18)
-keySub.Position = UDim2.new(0, 0, 0, 78)
-keySub.BackgroundTransparency = 1
-keySub.ZIndex = 15
-keySub.Text = VERSION .. " • NETWORK"
-keySub.TextColor3 = C.Accent2
-keySub.Font = Enum.Font.GothamBold
-keySub.TextSize = 11
-
-local keyLangBtn = Instance.new("TextButton", KeyFrame)
-keyLangBtn.Size = UDim2.new(0, 46, 0, 26)
-keyLangBtn.Position = UDim2.new(1, -58, 0, 12)
-keyLangBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-keyLangBtn.Text = T("langBtn")
-keyLangBtn.TextColor3 = C.Accent2
-keyLangBtn.Font = Enum.Font.GothamBold
-keyLangBtn.TextSize = 12
-keyLangBtn.BorderSizePixel = 0
-keyLangBtn.AutoButtonColor = false
-keyLangBtn.ZIndex = 15
-Corner(keyLangBtn, 8)
-keyLangBtn.MouseButton1Click:Connect(function()
-    Lang = (Lang == "ru") and "en" or "ru"
-    SaveLang(Lang)
-    PlayClick()
-    KeyGui:Destroy()
-    if getgenv then
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/p1shenak/main.lua/refs/heads/main/main.lua"))()
-    end
-end)
-
-local KeyBox = Instance.new("TextBox", KeyFrame)
-KeyBox.Size = UDim2.new(0.85, 0, 0, 48)
-KeyBox.Position = UDim2.new(0.075, 0, 0, 115)
-KeyBox.PlaceholderText = T("keyInput")
-KeyBox.Text = ""
-KeyBox.ClearTextOnFocus = false
-KeyBox.BackgroundColor3 = Color3.fromRGB(10, 10, 16)
-KeyBox.TextColor3 = C.Text
-KeyBox.PlaceholderColor3 = C.SubText
-KeyBox.Font = Enum.Font.Code
-KeyBox.TextSize = 14
-KeyBox.BorderSizePixel = 0
-KeyBox.ZIndex = 15
-Corner(KeyBox, 12)
-Stroke(KeyBox, C.Border, 1)
-
-local ActivateBtn = Instance.new("TextButton", KeyFrame)
-ActivateBtn.Size = UDim2.new(0.85, 0, 0, 46)
-ActivateBtn.Position = UDim2.new(0.075, 0, 0, 172)
-ActivateBtn.Text = T("activate")
-ActivateBtn.BackgroundColor3 = C.Accent
-ActivateBtn.TextColor3 = C.Text
-ActivateBtn.Font = Enum.Font.GothamBold
-ActivateBtn.TextSize = 14
-ActivateBtn.BorderSizePixel = 0
-ActivateBtn.AutoButtonColor = false
-ActivateBtn.ZIndex = 15
-Corner(ActivateBtn, 12)
-
-local divider = Instance.new("Frame", KeyFrame)
-divider.Size = UDim2.new(0.85, 0, 0, 1)
-divider.Position = UDim2.new(0.075, 0, 0, 240)
-divider.BackgroundColor3 = C.Border
-divider.BorderSizePixel = 0
-divider.ZIndex = 15
-
-local genTitle = Instance.new("TextLabel", KeyFrame)
-genTitle.Size = UDim2.new(1, 0, 0, 20)
-genTitle.Position = UDim2.new(0, 0, 0, 255)
-genTitle.BackgroundTransparency = 1
-genTitle.ZIndex = 15
-genTitle.Text = T("genTitle")
-genTitle.TextColor3 = C.SubText
-genTitle.Font = Enum.Font.GothamBold
-genTitle.TextSize = 11
-
-local durFrame = Instance.new("Frame", KeyFrame)
-durFrame.Size = UDim2.new(0.85, 0, 0, 34)
-durFrame.Position = UDim2.new(0.075, 0, 0, 285)
-durFrame.BackgroundTransparency = 1
-durFrame.ZIndex = 15
-local durLayout = Instance.new("UIListLayout", durFrame)
-durLayout.FillDirection = Enum.FillDirection.Horizontal
-durLayout.Padding = UDim.new(0, 6)
-durLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-local DURATIONS = {
-    {label = "1D", value = "1d"}, {label = "7D", value = "7d"},
-    {label = "30D", value = "30d"}, {label = "∞", value = "inf"}
-}
-local selectedDuration = "1d"
-local durButtons = {}
-
-for _, opt in ipairs(DURATIONS) do
-    local b = Instance.new("TextButton", durFrame)
-    b.Size = UDim2.new(0, 78, 1, 0)
-    b.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    b.Text = opt.label
-    b.TextColor3 = C.SubText
-    b.Font = Enum.Font.GothamBold
-    b.TextSize = 12
-    b.BorderSizePixel = 0
-    b.AutoButtonColor = false
-    b.ZIndex = 16
-    Corner(b, 8)
-    local bs = Stroke(b, C.Border, 1)
-
-    b.MouseButton1Click:Connect(function()
-        selectedDuration = opt.value
-        for _, other in ipairs(durButtons) do
-            Tween(other.btn, 0.2, {BackgroundColor3 = Color3.fromRGB(30, 30, 45)})
-            other.btn.TextColor3 = C.SubText
-            other.stroke.Color = C.Border
-        end
-        Tween(b, 0.2, {BackgroundColor3 = C.Accent})
-        b.TextColor3 = C.Text
-        bs.Color = C.Accent2
-        PlayClick()
-    end)
-    table.insert(durButtons, {btn = b, stroke = bs})
-end
-
-durButtons[1].btn.BackgroundColor3 = C.Accent
-durButtons[1].btn.TextColor3 = C.Text
-durButtons[1].stroke.Color = C.Accent2
-
-local GenBtn = Instance.new("TextButton", KeyFrame)
-GenBtn.Size = UDim2.new(0.85, 0, 0, 42)
-GenBtn.Position = UDim2.new(0.075, 0, 0, 335)
-GenBtn.Text = T("generate")
-GenBtn.BackgroundColor3 = C.Success
-GenBtn.TextColor3 = C.Text
-GenBtn.Font = Enum.Font.GothamBold
-GenBtn.TextSize = 13
-GenBtn.BorderSizePixel = 0
-GenBtn.AutoButtonColor = false
-GenBtn.ZIndex = 15
-Corner(GenBtn, 12)
-
-local CopyBtn = Instance.new("TextButton", KeyFrame)
-CopyBtn.Size = UDim2.new(0.42, 0, 0, 42)
-CopyBtn.Position = UDim2.new(0.075, 0, 0, 388)
-CopyBtn.Text = T("copyKey")
-CopyBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-CopyBtn.TextColor3 = C.Accent2
-CopyBtn.Font = Enum.Font.GothamBold
-CopyBtn.TextSize = 12
-CopyBtn.BorderSizePixel = 0
-CopyBtn.AutoButtonColor = false
-CopyBtn.ZIndex = 15
-Corner(CopyBtn, 12)
-
-local GetScriptBtn = Instance.new("TextButton", KeyFrame)
-GetScriptBtn.Size = UDim2.new(0.42, 0, 0, 42)
-GetScriptBtn.Position = UDim2.new(0.505, 0, 0, 388)
-GetScriptBtn.Text = T("getScript")
-GetScriptBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-GetScriptBtn.TextColor3 = C.Accent2
-GetScriptBtn.Font = Enum.Font.GothamBold
-GetScriptBtn.TextSize = 12
-GetScriptBtn.BorderSizePixel = 0
-GetScriptBtn.AutoButtonColor = false
-GetScriptBtn.ZIndex = 15
-Corner(GetScriptBtn, 12)
-
-KeyFrame.Size = UDim2.new(0, 0, 0, 0)
-KeyFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-task.wait(0.05)
-Tween(KeyFrame, 0.5, {
-    Size = UDim2.new(0, 420, 0, 550),
-    Position = UDim2.new(0.5, -210, 0.5, -275)
-}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
-ActivateBtn.MouseButton1Click:Connect(function()
-    if KeyBox.Text == "" then Notify(T("keyInput"), C.Warning) return end
-    ActivateBtn.Text = T("checking")
-    ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    PlayClick()
-    BurstFrom(ActivateBtn)
-    local valid = ValidateKey(KeyBox.Text)
-    if valid then
-        IsAuthenticated = true
-        SaveKey(KeyBox.Text)
-        Notify(T("accessGranted"), C.Success)
-        Tween(KeyFrame, 0.3, {
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0)
-        }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        task.wait(0.35)
-        KeyGui:Destroy()
-        ShowLoadingScreen(function() BuildUI() end)
-    else
-        KeyBox.Text = ""
-        KeyBox.PlaceholderText = T("keyInvalid")
-        ActivateBtn.Text = T("activate")
-        ActivateBtn.BackgroundColor3 = C.Accent
-        Notify(T("invalidKey"), C.Danger)
-    end
-end)
-
-GenBtn.MouseButton1Click:Connect(function()
-    GenBtn.Text = T("generating")
-    GenBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-    GenBtn.Active = false
-    PlayClick()
-    BurstFrom(GenBtn)
-    task.spawn(function()
-        local key, err = GenerateKeyRemote(selectedDuration)
-        if key then
-            KeyBox.Text = key
-            Notify(T("keyCreated"), C.Success)
-            GenBtn.Text = T("done")
-            GenBtn.BackgroundColor3 = C.Success
-        else
-            Notify(err or "Generate failed", C.Danger)
-            GenBtn.Text = T("generate")
-            GenBtn.BackgroundColor3 = C.Success
-            GenBtn.Active = true
-        end
-    end)
-end)
-
-CopyBtn.MouseButton1Click:Connect(function()
-    if KeyBox.Text == "" then Notify(T("noKey"), C.Warning) return end
-    if setclipboard then
-        setclipboard(KeyBox.Text)
-        Notify(T("keyCopiedMsg"), C.Success)
-        CopyBtn.Text = T("copied")
-        PlayClick()
-        task.wait(1.2)
-        CopyBtn.Text = T("copyKey")
-    end
-end)
-
-GetScriptBtn.MouseButton1Click:Connect(function()
-    if setclipboard then
-        setclipboard("https://fondi-mm-2-auntification.vercel.app/")
-        Notify(T("linkCopied"), C.Success)
-        GetScriptBtn.Text = T("copied")
-        PlayClick()
-        task.wait(1.5)
-        GetScriptBtn.Text = T("getScript")
-    end
-end)
-
---==================================================
--- AUTOLOGIN
---==================================================
-do
-    local saved = LoadLang()
-    if saved then Lang = saved end
-    LoadConfig()
-end
-
-task.spawn(function()
-    task.wait(0.5)
-    local saved = LoadKey()
-    if saved then
-        KeyBox.Text = saved
-        ActivateBtn.Text = T("autologin")
-        ActivateBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 90)
-        local valid = ValidateKey(saved)
-        if valid then
-            IsAuthenticated = true
-            KeyGui:Destroy()
-            ShowLoadingScreen(function()
-                BuildUI()
-                Notify(T("autologinOk"), C.Success, 3)
-            end)
-            return
-        end
-        ClearKey()
-    end
+-- ЗАПУСК БЕЗ КЛЮЧА
+ShowLoadingScreen(function()
+    BuildUI()
+    Notify("FONDI MM2 загружен! Нажми L для меню", C.Success, 4)
 end)
 
 print("==========================================")
-print("[FONDI MM2 " .. VERSION .. "] NETWORK EDITION READY")
+print("[FONDI MM2 " .. VERSION .. "] REAL EDITION READY")
+print("[FONDI MM2] Без ключа, без сайта")
 print("[FONDI MM2] Press L to toggle menu")
-print("[FONDI MM2] Fix: Fling (netowner + prediction), DamageIndicator, Anti-Fling threshold, FlingAll")
-print("[FONDI MM2] New: SilentAim, Radar, ItemESP, KillFeed, Config save/load")
 print("==========================================")
