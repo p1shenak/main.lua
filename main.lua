@@ -2324,7 +2324,6 @@ ShowLoadingScreen(function()
 end)
 
 print("==========================================")
-print("[FONDI MM2 " .. VERSION .. "] REAL EDITION READY")
-print("[FONDI MM2] Без ключа, без сайта")
+print("[FONDI MM2 " .. VERSION .. "] READY")
 print("[FONDI MM2] Press L to toggle menu")
 print("==========================================")
